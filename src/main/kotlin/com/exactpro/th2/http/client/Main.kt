@@ -129,6 +129,7 @@ fun run(
         settings.https,
         settings.host,
         settings.port,
+        settings.defaultHeaders,
         stateManager::prepareRequest,
         onRequest,
         onResponse
@@ -181,6 +182,7 @@ data class Settings(
     val host: String,
     val port: Int = if (https) 443 else 80,
     val sessionAlias: String,
+    val defaultHeaders: Map<String, List<String>> = emptyMap(),
     val auth: IAuthSettings? = null
 )
 
