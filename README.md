@@ -105,9 +105,11 @@ spec:
       attributes:
         - publish
         - second
+        - raw
     - name: out_response
       connection-type: mq
       attributes:
         - publish
         - first
+        - raw 
 ```
