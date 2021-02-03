@@ -17,6 +17,7 @@
 package com.exactpro.th2.http.client
 
 import mu.KotlinLogging
+import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
@@ -28,6 +29,7 @@ class HttpClient(
     https: Boolean,
     private val host: String,
     private val port: Int,
+    private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
@@ -47,6 +49,19 @@ class HttpClient(
 
         val preparedRequest = sendRequest.runCatching(prepareRequest).getOrElse {
             throw IllegalStateException("Failed to prepare request: ${request.eagerly()}", it)
+        }.run {
+            when {
+                defaultHeaders.isEmpty() -> this
+                defaultHeaders.keys.all(headers::contains) -> this
+                else -> withHeaders(RawHttpHeaders.newBuilder(headers).run {
+                    defaultHeaders.forEach { (header, values) ->
+                        if (!headers.contains(header)) {
+                            values.forEach { value -> with(header, value) }
+                        }
+                    }
+                    build()
+                })
+            }
         }
 
         val response = super.send(preparedRequest)
