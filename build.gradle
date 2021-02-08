@@ -1,5 +1,6 @@
 plugins {
-	id 'com.jfrog.artifactory' version '4.15.1'
+    id "com.jfrog.bintray" version '1.8.5'
+    id 'com.jfrog.artifactory' version '4.15.1'
     id 'com.palantir.docker' version '0.25.0' apply false
     id 'org.jetbrains.kotlin.jvm' version "${kotlin_version}"
     id "com.github.harbby.gradle.serviceloader" version '1.1.5'
@@ -34,11 +35,6 @@ repositories {
         url 'https://dl.bintray.com/exactpro/th2'
     }
 
-    maven {
-        name 'Artifactory release'
-        url 'http://artifactory5.exp.exactpro.com/artifactory/libs-release'
-    }
-
     mavenLocal()
 
     configurations.all {
@@ -61,10 +57,29 @@ jar {
     }
 }
 
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
+        }
+
+        bintrayPublication(MavenPublication) {
+            from components.java
+
+            groupId group
+            artifactId rootProject.name
+            version project.version
+
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('name', rootProject.name)
+                root.appendNode('url', project.vcs_url)
+            }
         }
     }
 
@@ -76,29 +91,32 @@ publishing {
     }
 }
 
-artifactory {
-    publish {
-        contextUrl = "${artifactory_url}"
+bintray {
+    user = "${bintray_user}"
+    key = "${bintray_key}"
+    publications = ['bintrayPublication']
 
-        repository {
-            repoKey = "${artifactory_deploy_repo_key}"
-            username = "${artifactory_user}"
-            password = "${artifactory_password}"
-        }
+    pkg {
+        repo = 'th2'
+        name = rootProject.name
+        userOrg = 'exactpro'
+        licenses = ['Apache-2.0']
+        vcsUrl = project.vcs_url
 
-        defaults {
-            publications('mavenJava')
-            publishArtifacts = true
-            publishBuildInfo = true
-            publishPom = true
+        version {
+            name = project.version
+            desc = project.version
+            released = new Date()
         }
     }
+
+    publish = true
 }
 
 dependencies {
     api platform('com.exactpro.th2:bom:2.10.1')
 
-    implementation 'com.exactpro.th2:common:2.7.0-th2-1150-+'
+    implementation 'com.exactpro.th2:common:3.0.1'
 
     implementation 'org.slf4j:slf4j-log4j12'
     implementation 'org.slf4j:slf4j-api'

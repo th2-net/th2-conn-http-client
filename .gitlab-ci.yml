@@ -1,8 +1,5 @@
 variables:
-  APP_NAME: th2-http-client
-  MAJOR_VERSION: 0
-  MINOR_VERSION: 0
-  MAINTENANCE_VERSION: 2
+  APP_NAME: th2-conn-http-client
 
 include:
   - project: vivarium/th2/pipelines

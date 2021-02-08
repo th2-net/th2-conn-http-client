@@ -27,6 +27,8 @@ https: false
 host: someapi.com
 port: 334
 sessionAlias: api_session
+defaultHeaders:
+  x-api-key: [ 'apikeywashere' ]
 auth:
   username: coolusername
   password: verystrongpassword
@@ -83,8 +85,8 @@ kind: Th2Box
 metadata:
   name: http-client
 spec:
-  image-name: nexus.exactpro.com:18000/th2-http-client
-  image-version: 0.0.2
+  image-name: ghcr.io/th2-net/th2-conn-http-client
+  image-version: 0.0.3
   custom-config:
     https: false
     host: 127.0.0.1
