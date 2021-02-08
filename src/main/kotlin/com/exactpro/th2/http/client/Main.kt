@@ -129,6 +129,7 @@ fun run(
         settings.https,
         settings.host,
         settings.port,
+        settings.keepAliveTimeout,
         settings.defaultHeaders,
         stateManager::prepareRequest,
         onRequest,
@@ -181,8 +182,9 @@ data class Settings(
     val https: Boolean = false,
     val host: String,
     val port: Int = if (https) 443 else 80,
-    val sessionAlias: String,
+    val keepAliveTimeout: Long = 15000,
     val defaultHeaders: Map<String, List<String>> = emptyMap(),
+    val sessionAlias: String,
     val auth: IAuthSettings? = null
 )
 

@@ -24,16 +24,18 @@ import rawhttp.core.client.TcpRawHttpClient
 import rawhttp.core.client.TcpRawHttpClient.DefaultOptions
 import java.net.Socket
 import java.net.URI
+import java.time.Instant
 
 class HttpClient(
     https: Boolean,
     private val host: String,
     private val port: Int,
+    keepAliveTimeout: Long,
     private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
-) : TcpRawHttpClient(ClientOptions(https, onRequest)) {
+) : TcpRawHttpClient(ClientOptions(https, keepAliveTimeout, onRequest)) {
     private val logger = KotlinLogging.logger {}
 
     val isRunning: Boolean
@@ -78,9 +80,11 @@ class HttpClient(
 
 private class ClientOptions(
     private val https: Boolean,
+    private val keepAliveTimeout: Long,
     private val onRequest: (RawHttpRequest) -> Unit,
 ) : DefaultOptions() {
     private val logger = KotlinLogging.logger {}
+    private val socketExpirationTimes = mutableMapOf<Socket, Long>()
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
         val request = httpRequest.eagerly()
@@ -97,5 +101,26 @@ private class ClientOptions(
 
     override fun createSocket(useHttps: Boolean, host: String, port: Int): Socket {
         return super.createSocket(https, host, port)
+    }
+
+    override fun getSocket(uri: URI): Socket = super.getSocket(uri).let { socket ->
+        val currentTime = System.currentTimeMillis()
+
+        socketExpirationTimes[socket]?.let { expirationTime ->
+            if (currentTime > expirationTime) {
+                logger.debug { "Removing inactive socket: $socket (expired at: ${Instant.ofEpochMilli(expirationTime)})" }
+                socketExpirationTimes -= socket
+                socket.runCatching { close() }
+                removeSocket(socket)
+                return getSocket(uri)
+            }
+        }
+
+        socketExpirationTimes[socket] = currentTime + keepAliveTimeout
+        socket
+    }
+
+    override fun removeSocket(socket: Socket) {
+        socketExpirationTimes -= socket
     }
 }
