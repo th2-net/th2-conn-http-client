@@ -9,7 +9,8 @@ Main configuration is done via setting following properties in a custom configur
 + **https** - enables HTTPS (`false` by default)
 + **host** - host for HTTP requests (e.g. `google.com`)
 + **port** - port for HTTP requests (`80` by default or `443` if `https` = `true`)
-+ **keepAliveTimeout** - socket inactivity timeout (`15000` by default)
++ **readTimeout** - socket read timeout in ms (`5000` by default)
++ **keepAliveTimeout** - socket inactivity timeout in ms (`15000` by default)
 + **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers are not affected, empty by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (empty by default)
@@ -28,6 +29,7 @@ https: false
 host: someapi.com
 port: 334
 sessionAlias: api_session
+readTimeout: 5000
 keepAliveTimeout: 15000
 defaultHeaders:
   x-api-key: [ 'apikeywashere' ]
@@ -88,12 +90,13 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.0.4
+  image-version: 0.0.5
   custom-config:
     https: false
     host: 127.0.0.1
     port: 8080
     sessionAlias: some_api
+    readTimeout: 5000
     keepAliveTimeout: 15000
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]

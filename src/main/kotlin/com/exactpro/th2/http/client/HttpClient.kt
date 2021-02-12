@@ -30,12 +30,13 @@ class HttpClient(
     https: Boolean,
     private val host: String,
     private val port: Int,
+    readTimeout: Int,
     keepAliveTimeout: Long,
     private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
-) : TcpRawHttpClient(ClientOptions(https, keepAliveTimeout, onRequest)) {
+) : TcpRawHttpClient(ClientOptions(https, readTimeout, keepAliveTimeout, onRequest)) {
     private val logger = KotlinLogging.logger {}
 
     val isRunning: Boolean
@@ -80,6 +81,7 @@ class HttpClient(
 
 private class ClientOptions(
     private val https: Boolean,
+    private val readTimeout: Int,
     private val keepAliveTimeout: Long,
     private val onRequest: (RawHttpRequest) -> Unit,
 ) : DefaultOptions() {
@@ -117,7 +119,7 @@ private class ClientOptions(
         }
 
         socketExpirationTimes[socket] = currentTime + keepAliveTimeout
-        socket
+        socket.apply { soTimeout = readTimeout }
     }
 
     override fun removeSocket(socket: Socket) {
