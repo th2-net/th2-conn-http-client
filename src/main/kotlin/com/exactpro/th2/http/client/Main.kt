@@ -160,7 +160,7 @@ fun run(
         message.groupsList.forEach { group ->
             group.runCatching(requestHandler::onRequest).recoverCatching {
                 LOGGER.error(it) { "Failed to handle message group: ${group.toPrettyString()}" }
-                eventRouter.storeEvent(rootEventId, "Failed to handle raw batch: ${group.toPrettyString()}", "Error", it)
+                eventRouter.storeEvent(rootEventId, "Failed to handle message group: ${group.toPrettyString()}", "Error", it)
             }
         }
     }

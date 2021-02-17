@@ -1,4 +1,4 @@
-# HTTP Client
+# HTTP Client v0.0.6
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -51,10 +51,10 @@ This section describes messages received and by produced by the service
 
 This service receives HTTP requests via MQ as `MessageGroup`s containing one of:
 
-* a single `RawMessage` containing request body, which can have `uri` and `method` properties in its metadata, which will be used in resulting request
+* a single `RawMessage` containing request body, which can have `uri`, `method`, and `contentType` properties in its metadata, which will be used in resulting request
 * a single `Message` with `Request` message type containing HTTP request line and headers and a `RawMessage` described above
 
-If both `Message` and `RawMessage` contain `uri` and `method` values from `Message` take precedence.  
+If both `Message` and `RawMessage` contain `uri`, `method`, and `contentType`, values from `Message` take precedence.  
 If none of them contain these values `/` and `GET` will be used as `uri` and `method` values respectively
 
 #### Message descriptions
@@ -77,7 +77,7 @@ If none of them contain these values `/` and `GET` will be used as `uri` and `me
 ### Outputs
 
 HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or response.   
-`RawMessage` also has `uri` and `method` properties set equal to URI and method of a request (or a response received for the request)
+`RawMessage` also has `uri`, `method`, and `contentType` properties set equal to URI, method, and content type of request (or a response received for the request)
 
 ## Deployment via `infra-mgr`
 
@@ -90,7 +90,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.0.5
+  image-version: 0.0.6
   custom-config:
     https: false
     host: 127.0.0.1

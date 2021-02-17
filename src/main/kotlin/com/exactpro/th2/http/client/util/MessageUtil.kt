@@ -55,9 +55,13 @@ private const val HEADER_VALUE_FIELD = "value"
 
 private const val METHOD_PROPERTY = METHOD_FIELD
 private const val URI_PROPERTY = URI_FIELD
+private const val CONTENT_TYPE_PROPERTY = "contentType"
 
 private const val DEFAULT_METHOD = "GET"
 private const val DEFAULT_URI = "/"
+
+private const val CONTENT_TYPE_HEADER = "Content-Type"
+private const val HEADER_VALUE_SEPARATOR = ";"
 
 private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     val metadata = body.metadata.propertiesMap
@@ -66,7 +70,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
 
     val httpRequestLine = RequestLine(method, URI(uri), HTTP_1_1)
     val httpHeaders = RawHttpHeaders.newBuilder()
-    val httpBody = BytesBody(body.body.toByteArray())
+    val httpBody = body.body.toByteArray().takeIf(ByteArray::isNotEmpty)?.run(::BytesBody)
 
     head.getList(HEADERS_FIELD)?.forEach {
         require(it.hasMessageValue()) { "Item of '$HEADERS_FIELD' field list is not a message: ${it.toPrettyString()}" }
@@ -74,6 +78,14 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
         val name = message.getString(HEADER_NAME_FIELD) ?: error("Header message has no $HEADER_NAME_FIELD field: ${message.toPrettyString()}")
         val value = message.getString(HEADER_NAME_FIELD) ?: error("Header message has no $HEADER_VALUE_FIELD field: ${message.toPrettyString()}")
         httpHeaders.with(name, value)
+    }
+
+    if (httpBody != null && CONTENT_TYPE_HEADER !in httpHeaders.headerNames) {
+        metadata[CONTENT_TYPE_PROPERTY]?.run {
+            split(HEADER_VALUE_SEPARATOR).forEach {
+                httpHeaders.with(CONTENT_TYPE_HEADER, it.trim())
+            }
+        }
     }
 
     return RawHttpRequest(httpRequestLine, httpHeaders.build(), null, null).withBody(httpBody)
@@ -138,7 +150,16 @@ private fun ByteArrayOutputStream.toBatch(
 }.toBatch()
 
 private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): MessageGroupBatch {
-    val metadataProperties = request.run { mapOf("method" to method, "uri" to uri.toString()) }
+    val metadataProperties = request.run {
+        mutableMapOf(
+            METHOD_PROPERTY to method,
+            URI_PROPERTY to uri.toString()
+        ).apply {
+            val contentTypes = headers[CONTENT_TYPE_HEADER].joinToString(HEADER_VALUE_SEPARATOR)
+            if (contentTypes.isNotEmpty()) this[CONTENT_TYPE_PROPERTY] = contentTypes
+        }
+    }
+
     return ByteArrayOutputStream().run {
         startLine.writeTo(this)
         headers.writeTo(this)
