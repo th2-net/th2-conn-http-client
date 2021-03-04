@@ -92,7 +92,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
 }
 
 private fun Message.requireType(type: String): Message = apply {
-    check(metadata.messageType == type) { "Invalid message type: $type" }
+    check(metadata.messageType == type) { "Invalid message type: ${metadata.messageType} (expected: $type)" }
 }
 
 private fun AnyMessage.toParsed(name: String): Message = run {
