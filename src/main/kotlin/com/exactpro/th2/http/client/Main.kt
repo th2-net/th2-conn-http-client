@@ -112,16 +112,15 @@ fun run(
         type("Microservice")
     }).id
 
-    val generateSequence = Instant.now().run {
-        AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
-    }::incrementAndGet
+    val incomingSequence = createSequence()
+    val outgoingSequence = createSequence()
 
     val onRequest = { request: RawHttpRequest ->
-        messageRouter.send(request.toBatch(connectionId, generateSequence()), SECOND.toString())
+        messageRouter.send(request.toBatch(connectionId, outgoingSequence()), SECOND.toString())
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageRouter.send(response.toBatch(connectionId, generateSequence(), request), FIRST.toString())
+        messageRouter.send(response.toBatch(connectionId, incomingSequence(), request), FIRST.toString())
         stateManager.onResponse(response)
     }
 
@@ -200,3 +199,7 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
         else -> error("More than 1 non-default instance of ${T::class.simpleName} has been found: $instances")
     }
 }
+
+private fun createSequence(): () -> Long = Instant.now().run {
+    AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
+}::incrementAndGet

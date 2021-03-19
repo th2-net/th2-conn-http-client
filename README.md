@@ -1,4 +1,4 @@
-# HTTP Client v0.0.7
+# HTTP Client v0.0.8
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -17,7 +17,7 @@ Main configuration is done via setting following properties in a custom configur
 
 ### Authentication configuration
 
-Basic authentication can configured via settings following properties in the `auth` block of the main configuration
+Basic authentication can configured via setting following properties in the `auth` block of the main configuration
 
 + **username** - basic authentication username
 + **password** - basic authentication password
@@ -90,7 +90,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.0.7
+  image-version: 0.0.8
   custom-config:
     https: false
     host: 127.0.0.1
@@ -121,10 +121,20 @@ spec:
       attributes:
         - publish
         - first
-        - raw 
+        - raw
+  extended-settings:
+    service:
+      enabled: false
 ```
 
 ## Changelog
+
+### v0.0.8
+
+#### Changed:
+
+* use separate sequences for request and response message streams
+* don't overwrite `Content-Length` header if it's already present
 
 ### v0.0.7
 

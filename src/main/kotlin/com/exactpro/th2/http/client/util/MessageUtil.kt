@@ -61,6 +61,7 @@ private const val DEFAULT_METHOD = "GET"
 private const val DEFAULT_URI = "/"
 
 private const val CONTENT_TYPE_HEADER = "Content-Type"
+private const val CONTENT_LENGTH_HEADER = "Content-Length"
 private const val HEADER_VALUE_SEPARATOR = ";"
 
 private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
@@ -70,7 +71,6 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
 
     val httpRequestLine = RequestLine(method, URI(uri), HTTP_1_1)
     val httpHeaders = RawHttpHeaders.newBuilder()
-    val httpBody = body.body.toByteArray().takeIf(ByteArray::isNotEmpty)?.run(::BytesBody)
 
     head.getList(HEADERS_FIELD)?.forEach {
         require(it.hasMessageValue()) { "Item of '$HEADERS_FIELD' field list is not a message: ${it.toPrettyString()}" }
@@ -80,15 +80,23 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
         httpHeaders.with(name, value)
     }
 
-    if (httpBody != null && CONTENT_TYPE_HEADER !in httpHeaders.headerNames) {
-        metadata[CONTENT_TYPE_PROPERTY]?.run {
-            split(HEADER_VALUE_SEPARATOR).forEach {
-                httpHeaders.with(CONTENT_TYPE_HEADER, it.trim())
+    val httpBody = body.body.toByteArray().takeIf(ByteArray::isNotEmpty)?.run {
+        if (CONTENT_TYPE_HEADER !in httpHeaders.headerNames) {
+            metadata[CONTENT_TYPE_PROPERTY]?.run {
+                split(HEADER_VALUE_SEPARATOR).forEach {
+                    httpHeaders.with(CONTENT_TYPE_HEADER, it.trim())
+                }
             }
         }
+
+        if (CONTENT_LENGTH_HEADER !in httpHeaders.headerNames) {
+            httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
+        }
+
+        BytesBody(this).toBodyReader()
     }
 
-    return RawHttpRequest(httpRequestLine, httpHeaders.build(), null, null).withBody(httpBody)
+    return RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null)
 }
 
 private fun Message.requireType(type: String): Message = apply {
