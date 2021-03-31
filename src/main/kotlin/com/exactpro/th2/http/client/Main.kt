@@ -173,8 +173,11 @@ fun run(
     }
 
     LOGGER.info { "Successfully started" }
-    @Suppress("ControlFlowWithEmptyBody")
-    while (client.isRunning);
+
+    while (client.isRunning) {
+        Thread.sleep(1000)
+    }
+
     LOGGER.info { "Finished running" }
 }
 
