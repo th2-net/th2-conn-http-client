@@ -1,4 +1,4 @@
-# HTTP Client v0.0.12
+# HTTP Client v0.0.13
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -128,6 +128,12 @@ spec:
 ```
 
 ## Changelog
+
+### v0.0.13
+
+#### Changed:
+
+* response message will be with same parent event id as request message batch
 
 ### v0.0.10
 
