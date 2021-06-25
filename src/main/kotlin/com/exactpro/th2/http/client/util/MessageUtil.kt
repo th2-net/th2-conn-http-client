@@ -30,6 +30,7 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.getList
 import com.exactpro.th2.common.message.getString
 import com.exactpro.th2.common.message.toTimestamp
+import com.exactpro.th2.http.client.api.Th2RawHttpEvent
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder
@@ -96,7 +97,9 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
         BytesBody(this).toBodyReader()
     }
 
-    return RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null)
+    val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
+
+    return Th2RawHttpEvent(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId)
 }
 
 private fun Message.requireType(type: String): Message = apply {
@@ -143,8 +146,12 @@ private fun ByteArrayOutputStream.toBatch(
     connectionId: ConnectionID,
     direction: Direction,
     sequence: Long,
-    metadataProperties: Map<String, String>
+    metadataProperties: Map<String, String>,
+    parentEventID: String? = null
 ) = RawMessage.newBuilder().apply {
+    parentEventID?.let {
+        this.parentEventIdBuilder.setId(parentEventID)
+    }
     this.body = ByteString.copyFrom(toByteArray())
     this.metadataBuilder {
         putAllProperties(metadataProperties)
@@ -167,12 +174,12 @@ private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction
             if (contentTypes.isNotEmpty()) this[CONTENT_TYPE_PROPERTY] = contentTypes
         }
     }
-
+    val parentEventID = if (request is Th2RawHttpEvent) request.parentEventId else null
     return ByteArrayOutputStream().run {
         startLine.writeTo(this)
         headers.writeTo(this)
         body.ifPresent { it.writeTo(this) }
-        toBatch(connectionId, direction, sequence, metadataProperties)
+        toBatch(connectionId, direction, sequence, metadataProperties, parentEventID)
     }
 }
 
