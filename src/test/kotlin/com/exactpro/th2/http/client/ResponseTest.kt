@@ -6,7 +6,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.http.client.api.Th2RawHttpEvent
+import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toRequest
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterAll
@@ -94,8 +94,8 @@ class ResponseTest {
         assertNotNull(callbackRequest, "Request wasn't handled by onResponse callback")
         assertNotNull(callbackResponse, "Response wasn't handled by onResponse callback")
 
-        if (callbackRequest is Th2RawHttpEvent) {
-            assertEquals((callbackRequest as Th2RawHttpEvent).parentEventId,"123")
+        if (callbackRequest is Th2RawHttpRequest) {
+            assertEquals((callbackRequest as Th2RawHttpRequest).parentEventId,"123")
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }

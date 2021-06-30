@@ -8,12 +8,8 @@ import rawhttp.core.RequestLine
 import rawhttp.core.body.BodyReader
 import rawhttp.core.body.HttpMessageBody
 
-class Th2RawHttpEvent (private val requestLine: RequestLine, headers: RawHttpHeaders, bodyReader: BodyReader?, senderAddress: InetAddress?, val parentEventId: String)
+class Th2RawHttpRequest (requestLine: RequestLine, headers: RawHttpHeaders, bodyReader: BodyReader?, senderAddress: InetAddress?, val parentEventId: String)
     : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
-
-    override fun getStartLine(): RequestLine {
-        return requestLine
-    }
 
     override fun withBody(body: HttpMessageBody?): RawHttpRequest? {
         return withBody(body, true)
@@ -21,7 +17,7 @@ class Th2RawHttpEvent (private val requestLine: RequestLine, headers: RawHttpHea
 
     override fun withBody(body: HttpMessageBody?, adjustHeaders: Boolean): RawHttpRequest? {
         return withBody(body, adjustHeaders) { headers: RawHttpHeaders, bodyReader: BodyReader? ->
-            Th2RawHttpEvent(
+            Th2RawHttpRequest(
                 startLine,
                 headers,
                 bodyReader,
@@ -40,7 +36,7 @@ class Th2RawHttpEvent (private val requestLine: RequestLine, headers: RawHttpHea
                 .overwrite("Host", newHost)
                 .build()
         }
-        return Th2RawHttpEvent(
+        return Th2RawHttpRequest(
             requestLine,
             headers,
             body.orElse(null),
@@ -54,7 +50,7 @@ class Th2RawHttpEvent (private val requestLine: RequestLine, headers: RawHttpHea
     }
 
     override fun withHeaders(headers: RawHttpHeaders, append: Boolean): RawHttpRequest {
-        return Th2RawHttpEvent(
+        return Th2RawHttpRequest(
             startLine,
             if (append) getHeaders().and(headers) else headers.and(getHeaders()),
             body.orElse(null),

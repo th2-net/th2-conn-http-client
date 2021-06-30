@@ -30,7 +30,7 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.getList
 import com.exactpro.th2.common.message.getString
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.http.client.api.Th2RawHttpEvent
+import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder
@@ -99,7 +99,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
 
-    return Th2RawHttpEvent(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId)
+    return Th2RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId)
 }
 
 private fun Message.requireType(type: String): Message = apply {
@@ -174,7 +174,7 @@ private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction
             if (contentTypes.isNotEmpty()) this[CONTENT_TYPE_PROPERTY] = contentTypes
         }
     }
-    val parentEventID = if (request is Th2RawHttpEvent) request.parentEventId else null
+    val parentEventID = if (request is Th2RawHttpRequest) request.parentEventId else null
     return ByteArrayOutputStream().run {
         startLine.writeTo(this)
         headers.writeTo(this)
