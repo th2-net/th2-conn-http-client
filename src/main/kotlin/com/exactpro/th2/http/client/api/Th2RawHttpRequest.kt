@@ -8,12 +8,13 @@ import rawhttp.core.RequestLine
 import rawhttp.core.body.BodyReader
 import rawhttp.core.body.HttpMessageBody
 
-class Th2RawHttpRequest (requestLine: RequestLine, headers: RawHttpHeaders, bodyReader: BodyReader?, senderAddress: InetAddress?, val parentEventId: String)
-    : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
-
-    override fun withBody(body: HttpMessageBody?): RawHttpRequest? {
-        return withBody(body, true)
-    }
+class Th2RawHttpRequest (
+    requestLine: RequestLine,
+    headers: RawHttpHeaders, bodyReader:
+    BodyReader?,
+    senderAddress: InetAddress?,
+    val parentEventId: String
+    ) : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
 
     override fun withBody(body: HttpMessageBody?, adjustHeaders: Boolean): RawHttpRequest? {
         return withBody(body, adjustHeaders) { headers: RawHttpHeaders, bodyReader: BodyReader? ->
@@ -29,7 +30,6 @@ class Th2RawHttpRequest (requestLine: RequestLine, headers: RawHttpHeaders, body
 
     override fun withRequestLine(requestLine: RequestLine): RawHttpRequest {
         val newHost = RawHttpHeaders.hostHeaderValueFor(requestLine.uri) ?: error("RequestLine host must not be null")
-
         val headers: RawHttpHeaders = when {
             newHost.equals(headers.getFirst("Host").orElse(""), true) -> headers
             else -> RawHttpHeaders.newBuilderSkippingValidation(headers)

@@ -8,38 +8,34 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toRequest
+import java.net.URI
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import rawhttp.core.server.TcpRawHttpServer
 import java.time.Instant
 import java.util.Optional
-import kotlin.test.assertNotNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.fail
+import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
-import rawhttp.core.RawHttpRequest
-
+import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpResponse
+import rawhttp.core.RequestLine
 
-private val LOGGER = KotlinLogging.logger { }
-
-class ResponseTest {
+class RequestTest {
     companion object {
+        private val LOGGER = KotlinLogging.logger { }
+
         private const val serverPort = 8086
-        private const val responseBody = "{\"Value\": \"Test\"}"
 
         private val server = TcpRawHttpServer(serverPort)
 
         private val response: RawHttpResponse<*> = RawHttp().parseResponse(
             """
-          HTTP/1.1 200 OK
-          Content-Type: plain/text
-          Content-Length: ${responseBody.length}
-          
-          $responseBody
-          """.trimIndent()
+            HTTP/1.1 200 OK
+            """.trimIndent()
         )
 
         @BeforeAll
@@ -58,22 +54,9 @@ class ResponseTest {
     }
 
     @Test
-    fun `Test to for client behavior`() {
+    fun `Request parent id test`() {
         val testParentEventId = "123"
 
-        var callbackRequest : RawHttpRequest? = null
-        var callbackResponse : RawHttpResponse<*>? = null
-
-        val prepareRequest = { request : RawHttpRequest ->  request}
-        val onRequest = { request : RawHttpRequest ->  LOGGER.debug("Request submitted: $request") }
-        val onResponse = { request : RawHttpRequest, response : RawHttpResponse<*> ->
-            callbackRequest = request
-            callbackResponse = response
-            LOGGER.debug("Response handled: $response")
-        }
-
-
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000, emptyMap(), prepareRequest, onRequest, onResponse)
         val message = RawMessage.newBuilder().apply {
             this.parentEventIdBuilder.id = testParentEventId
             this.metadataBuilder.apply {
@@ -86,22 +69,16 @@ class ResponseTest {
             }
         }.build()
 
-        val messageGroup = MessageGroup.newBuilder()
-        messageGroup.addMessages(AnyMessage.newBuilder().setRawMessage(message).build())
+        val requestLine =  RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
+        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build().toRequest()
+            .withRequestLine(requestLine)
+            .withBody(null)
+            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
-        client.send(messageGroup.build().toRequest())
-
-        assertNotNull(callbackRequest, "Request wasn't handled by onResponse callback")
-        assertNotNull(callbackResponse, "Response wasn't handled by onResponse callback")
-
-        if (callbackRequest is Th2RawHttpRequest) {
-            assertEquals((callbackRequest as Th2RawHttpRequest).parentEventId,"123")
+        if (request is Th2RawHttpRequest) {
+            assertEquals(request.parentEventId,"123")
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }
-
-        assertEquals(responseBody, callbackResponse!!.body.get().toString())
-
-
     }
 }

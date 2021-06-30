@@ -149,9 +149,7 @@ private fun ByteArrayOutputStream.toBatch(
     metadataProperties: Map<String, String>,
     parentEventID: String? = null
 ) = RawMessage.newBuilder().apply {
-    parentEventID?.let {
-        this.parentEventIdBuilder.setId(parentEventID)
-    }
+    parentEventID?.let(parentEventIdBuilder::setId)
     this.body = ByteString.copyFrom(toByteArray())
     this.metadataBuilder {
         putAllProperties(metadataProperties)
@@ -174,7 +172,7 @@ private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction
             if (contentTypes.isNotEmpty()) this[CONTENT_TYPE_PROPERTY] = contentTypes
         }
     }
-    val parentEventID = if (request is Th2RawHttpRequest) request.parentEventId else null
+    val parentEventID = (request as? Th2RawHttpRequest)?.parentEventId
     return ByteArrayOutputStream().run {
         startLine.writeTo(this)
         headers.writeTo(this)
