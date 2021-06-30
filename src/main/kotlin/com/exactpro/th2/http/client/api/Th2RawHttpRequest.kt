@@ -28,14 +28,15 @@ class Th2RawHttpRequest (requestLine: RequestLine, headers: RawHttpHeaders, body
     }
 
     override fun withRequestLine(requestLine: RequestLine): RawHttpRequest {
-        val newHost = checkNotNull(RawHttpHeaders.hostHeaderValueFor(requestLine.uri)) {"RequestLine host must not be null"}
-        val headers: RawHttpHeaders = if (newHost.equals(headers.getFirst("Host").orElse(""), true)) {
-            headers
-        } else {
-            RawHttpHeaders.newBuilderSkippingValidation(headers)
+        val newHost = RawHttpHeaders.hostHeaderValueFor(requestLine.uri) ?: error("RequestLine host must not be null")
+
+        val headers: RawHttpHeaders = when {
+            newHost.equals(headers.getFirst("Host").orElse(""), true) -> headers
+            else -> RawHttpHeaders.newBuilderSkippingValidation(headers)
                 .overwrite("Host", newHost)
                 .build()
         }
+
         return Th2RawHttpRequest(
             requestLine,
             headers,
