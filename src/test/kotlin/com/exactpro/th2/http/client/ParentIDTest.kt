@@ -10,19 +10,13 @@ import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toRequest
 import java.net.URI
-import mu.KotlinLogging
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
-import rawhttp.core.server.TcpRawHttpServer
 import java.time.Instant
-import java.util.Optional
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.fail
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
-import rawhttp.core.RawHttpResponse
 import rawhttp.core.RequestLine
 
 class ParentIDTest {
@@ -47,8 +41,7 @@ class ParentIDTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        val request =
-            MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
                 .toRequest()
                 .withRequestLine(requestLine)
                 .withBody(null)
@@ -78,8 +71,7 @@ class ParentIDTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        var request =
-            MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+        var request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
                 .toRequest()
                 .withRequestLine(requestLine)
                 .withBody(null)
