@@ -55,7 +55,7 @@ class ParentIDTest {
     }
 
     @Test
-    fun `Request parent id to Response parent id to Request parent id, check data loss`() {
+    fun `RawMessage to Request, to Response data, check parent id loss`() {
         val testParentEventId = "123"
 
         val message = RawMessage.newBuilder().apply {
