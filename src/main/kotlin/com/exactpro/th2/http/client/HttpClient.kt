@@ -67,7 +67,14 @@ class HttpClient(
             }
         }
 
-        val response = super.send(preparedRequest)
+        val response = runCatching {
+            super.send(preparedRequest)
+        }.getOrElse { cause ->
+            val socket = options.getSocket(preparedRequest.uri)
+            logger.error(cause) { "Removing socket due to network error: $socket" }
+            options.removeSocket(socket)
+            throw cause
+        }
 
         response.runCatching {
             onResponse(preparedRequest, response)
@@ -111,7 +118,6 @@ private class ClientOptions(
         socketExpirationTimes[socket]?.let { expirationTime ->
             if (currentTime > expirationTime) {
                 logger.debug { "Removing inactive socket: $socket (expired at: ${Instant.ofEpochMilli(expirationTime)})" }
-                socket.runCatching { close() }
                 removeSocket(socket)
                 return getSocket(uri)
             }
@@ -122,6 +128,7 @@ private class ClientOptions(
     }
 
     override fun removeSocket(socket: Socket) {
+        socket.runCatching { close() }
         super.removeSocket(socket)
         socketExpirationTimes -= socket
     }
