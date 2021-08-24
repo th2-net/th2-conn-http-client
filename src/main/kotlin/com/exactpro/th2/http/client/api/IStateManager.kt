@@ -44,6 +44,11 @@ interface IStateManager : AutoCloseable {
      */
     fun onResponse(response: RawHttpResponse<*>)
 
+    /**
+     * Performs shutdown process (e.g. logout)
+     */
+    fun onStop() {}
+
     data class StateManagerContext(
         val httpClient: RawHttpClient<*>,
         val authSettings: IAuthSettings?

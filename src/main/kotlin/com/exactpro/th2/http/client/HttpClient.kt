@@ -25,6 +25,8 @@ import rawhttp.core.client.TcpRawHttpClient.DefaultOptions
 import java.net.Socket
 import java.net.URI
 import java.time.Instant
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class HttpClient(
     https: Boolean,
@@ -36,13 +38,43 @@ class HttpClient(
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
+    private val onStart: () -> Unit = {},
+    private val onStop: () -> Unit = {},
 ) : TcpRawHttpClient(ClientOptions(https, readTimeout, keepAliveTimeout, onRequest)) {
     private val logger = KotlinLogging.logger {}
+    private val lock = ReentrantLock()
 
-    val isRunning: Boolean
-        get() = !options.executorService.isShutdown
+    @Volatile var isRunning: Boolean = false
+        private set
+
+    fun start() = lock.withLock {
+        when (isRunning) {
+            true -> logger.info { "Client is already started" }
+            else -> {
+                logger.info { "Starting client" }
+                runCatching(onStart).onFailure { throw IllegalStateException("Failed to execute onStart hook", it) }
+                isRunning = true
+                logger.info { "Started client" }
+            }
+        }
+    }
+
+    fun stop() = lock.withLock {
+        when (!isRunning) {
+            true -> logger.info { "Client is already stopped" }
+            else -> {
+                logger.info { "Stopping client" }
+                runCatching(onStop).onFailure { logger.error(it) { "Failed to execute onStop hook" } }
+                (options as ClientOptions).removeSockets()
+                isRunning = false
+                logger.info { "Stopped client" }
+            }
+        }
+    }
 
     override fun send(request: RawHttpRequest): RawHttpResponse<Void> {
+        if (!isRunning) start()
+
         val sendRequest = request.run {
             when {
                 host != uri.host || port != uri.port -> withRequestLine(startLine.withHost("$host:$port"))
@@ -83,6 +115,11 @@ class HttpClient(
         }
 
         return response
+    }
+
+    override fun close() {
+        if (isRunning) stop()
+        super.close()
     }
 }
 
@@ -131,5 +168,10 @@ private class ClientOptions(
         socket.runCatching { close() }
         super.removeSocket(socket)
         socketExpirationTimes -= socket
+    }
+
+    fun removeSockets() = socketExpirationTimes.keys.removeIf {
+        removeSocket(it)
+        true
     }
 }

@@ -51,7 +51,9 @@ import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
+import kotlin.concurrent.withLock
 import kotlin.system.exitProcess
 
 private val LOGGER = KotlinLogging.logger { }
@@ -133,16 +135,17 @@ fun run(
         settings.defaultHeaders,
         stateManager::prepareRequest,
         onRequest,
-        onResponse
+        onResponse,
+        stateManager::onStart,
+        stateManager::onStop
     ).apply { registerResource("client", ::close) }
 
     stateManager.runCatching {
         registerResource("state-manager", ::close)
         init(StateManagerContext(client, settings.auth))
-        onStart()
     }.onFailure {
-        LOGGER.error(it) { "Failed to init or start state manager" }
-        eventRouter.storeEvent(rootEventId, "Failed to init or start state manager", "Error", it)
+        LOGGER.error(it) { "Failed to init state manager" }
+        eventRouter.storeEvent(rootEventId, "Failed to init state manager", "Error", it)
         throw it
     }
 
@@ -172,10 +175,16 @@ fun run(
         throw IllegalStateException("Failed to subscribe to input queue", it)
     }
 
+    client.runCatching(HttpClient::start).onFailure {
+        throw IllegalStateException("Failed to start client", it)
+    }
+
     LOGGER.info { "Successfully started" }
 
-    while (client.isRunning) {
-        Thread.sleep(1000)
+    ReentrantLock().run {
+        val condition = newCondition()
+        registerResource("await-shutdown") { withLock(condition::signalAll) }
+        withLock(condition::await)
     }
 
     LOGGER.info { "Finished running" }
