@@ -137,7 +137,7 @@ fun run(
         onRequest,
         onResponse,
         stateManager::onStart,
-        stateManager::onStop
+        stateManager::onStop,
     ).apply { registerResource("client", ::close) }
 
     stateManager.runCatching {
