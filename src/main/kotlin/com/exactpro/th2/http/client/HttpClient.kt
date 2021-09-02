@@ -52,8 +52,11 @@ class HttpClient(
             true -> logger.info { "Client is already started" }
             else -> {
                 logger.info { "Starting client" }
-                runCatching(onStart).onFailure { throw IllegalStateException("Failed to execute onStart hook", it) }
                 isRunning = true
+                runCatching(onStart).onFailure {
+                    isRunning = false
+                    throw IllegalStateException("Failed to execute onStart hook", it)
+                }
                 logger.info { "Started client" }
             }
         }

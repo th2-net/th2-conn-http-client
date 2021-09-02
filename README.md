@@ -1,4 +1,4 @@
-# HTTP Client v0.1.0
+# HTTP Client v0.1.1
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -90,7 +90,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.1.0
+  image-version: 0.1.1
   custom-config:
     https: false
     host: 127.0.0.1
@@ -128,6 +128,12 @@ spec:
 ```
 
 ## Changelog
+
+### v0.1.1
+
+#### Fixed:
+
+* potential endless-loop if `onStart` handler tries to send something
 
 ### v0.1.0
 
