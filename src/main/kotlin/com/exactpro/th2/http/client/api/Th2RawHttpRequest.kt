@@ -1,34 +1,33 @@
 package com.exactpro.th2.http.client.api
 
-
-import java.net.InetAddress
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RequestLine
 import rawhttp.core.body.BodyReader
 import rawhttp.core.body.HttpMessageBody
+import java.net.InetAddress
 
-class Th2RawHttpRequest (
+class Th2RawHttpRequest(
     requestLine: RequestLine,
-    headers: RawHttpHeaders, bodyReader:
-    BodyReader?,
+    headers: RawHttpHeaders,
+    bodyReader: BodyReader?,
     senderAddress: InetAddress?,
-    val parentEventId: String
-    ) : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
+    val parentEventId: String,
+    val metadataProperties: Map<String, String>
+) : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
 
-    override fun withBody(body: HttpMessageBody?, adjustHeaders: Boolean): RawHttpRequest? {
-        return withBody(body, adjustHeaders) { headers: RawHttpHeaders, bodyReader: BodyReader? ->
-            Th2RawHttpRequest(
-                startLine,
-                headers,
-                bodyReader,
-                senderAddress.orElse(null),
-                this.parentEventId
-            )
-        }
+    override fun withBody(body: HttpMessageBody?, adjustHeaders: Boolean): Th2RawHttpRequest = withBody(body, adjustHeaders) { headers: RawHttpHeaders, bodyReader: BodyReader? ->
+        Th2RawHttpRequest(
+            startLine,
+            headers,
+            bodyReader,
+            senderAddress.orElse(null),
+            parentEventId,
+            metadataProperties
+        )
     }
 
-    override fun withRequestLine(requestLine: RequestLine): RawHttpRequest {
+    override fun withRequestLine(requestLine: RequestLine): Th2RawHttpRequest {
         val newHost = RawHttpHeaders.hostHeaderValueFor(requestLine.uri) ?: error("RequestLine host must not be null")
         val headers: RawHttpHeaders = when {
             newHost.equals(headers.getFirst("Host").orElse(""), true) -> headers
@@ -42,21 +41,19 @@ class Th2RawHttpRequest (
             headers,
             body.orElse(null),
             senderAddress.orElse(null),
-            this.parentEventId
+            parentEventId,
+            metadataProperties
         )
     }
 
-    override fun withHeaders(headers: RawHttpHeaders): RawHttpRequest {
-        return withHeaders(headers, true)
-    }
+    override fun withHeaders(headers: RawHttpHeaders): Th2RawHttpRequest = withHeaders(headers, true)
 
-    override fun withHeaders(headers: RawHttpHeaders, append: Boolean): RawHttpRequest {
-        return Th2RawHttpRequest(
-            startLine,
-            if (append) getHeaders().and(headers) else headers.and(getHeaders()),
-            body.orElse(null),
-            senderAddress.orElse(null),
-            this.parentEventId
-        )
-    }
+    override fun withHeaders(headers: RawHttpHeaders, append: Boolean): Th2RawHttpRequest = Th2RawHttpRequest(
+        startLine,
+        if (append) getHeaders().and(headers) else headers.and(getHeaders()),
+        body.orElse(null),
+        senderAddress.orElse(null),
+        parentEventId,
+        metadataProperties
+    )
 }
