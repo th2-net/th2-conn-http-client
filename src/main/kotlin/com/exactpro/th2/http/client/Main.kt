@@ -138,6 +138,7 @@ fun run(
         onResponse,
         stateManager::onStart,
         stateManager::onStop,
+        settings.validateCertificates
     ).apply { registerResource("client", ::close) }
 
     stateManager.runCatching {
@@ -198,7 +199,8 @@ data class Settings(
     val keepAliveTimeout: Long = 15000,
     val defaultHeaders: Map<String, List<String>> = emptyMap(),
     val sessionAlias: String,
-    val auth: IAuthSettings? = null
+    val auth: IAuthSettings? = null,
+    val validateCertificates: Boolean = true
 )
 
 private inline fun <reified T> load(defaultImpl: Class<out T>): T {
