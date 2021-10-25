@@ -98,8 +98,9 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     }
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
+    val metadataProperties = body.metadata.propertiesMap + head.metadata.propertiesMap
 
-    return Th2RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId)
+    return Th2RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId, metadataProperties)
 }
 
 private fun Message.requireType(type: String): Message = apply {
@@ -147,9 +148,9 @@ private fun ByteArrayOutputStream.toBatch(
     direction: Direction,
     sequence: Long,
     metadataProperties: Map<String, String>,
-    parentEventID: String? = null
+    parentEventId: String? = null
 ) = RawMessage.newBuilder().apply {
-    parentEventID?.let(parentEventIdBuilder::setId)
+    parentEventId?.let(parentEventIdBuilder::setId)
     this.body = ByteString.copyFrom(toByteArray())
     this.metadataBuilder {
         putAllProperties(metadataProperties)
@@ -163,21 +164,23 @@ private fun ByteArrayOutputStream.toBatch(
 }.toBatch()
 
 private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): MessageGroupBatch {
-    val metadataProperties = request.run {
-        mutableMapOf(
-            METHOD_PROPERTY to method,
-            URI_PROPERTY to uri.toString()
-        ).apply {
-            val contentTypes = headers[CONTENT_TYPE_HEADER].joinToString(HEADER_VALUE_SEPARATOR)
-            if (contentTypes.isNotEmpty()) this[CONTENT_TYPE_PROPERTY] = contentTypes
-        }
+    val (metadataProperties, parentEventId) = when (request) {
+        is Th2RawHttpRequest -> request.metadataProperties.toMutableMap() to request.parentEventId
+        else -> mutableMapOf<String, String>() to null
     }
-    val parentEventID = (request as? Th2RawHttpRequest)?.parentEventId
+
+    metadataProperties[METHOD_PROPERTY] = request.method
+    metadataProperties[URI_PROPERTY] = request.uri.toString()
+
+    if (CONTENT_TYPE_HEADER in headers) {
+        metadataProperties[CONTENT_TYPE_PROPERTY] = headers[CONTENT_TYPE_HEADER].joinToString(HEADER_VALUE_SEPARATOR)
+    }
+
     return ByteArrayOutputStream().run {
         startLine.writeTo(this)
         headers.writeTo(this)
         body.ifPresent { it.writeTo(this) }
-        toBatch(connectionId, direction, sequence, metadataProperties, parentEventID)
+        toBatch(connectionId, direction, sequence, metadataProperties, parentEventId)
     }
 }
 

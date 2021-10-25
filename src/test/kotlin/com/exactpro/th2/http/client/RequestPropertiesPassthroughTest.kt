@@ -9,28 +9,31 @@ import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toRequest
-import java.net.URI
-import java.time.Instant
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
+import org.junit.jupiter.api.Test
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RequestLine
+import java.net.URI
+import java.time.Instant
 
-class ParentIDTest {
+class RequestPropertiesPassthroughTest {
     companion object {
         private const val serverPort = 8086
     }
 
     @Test
-    fun `Request parent id test`() {
-        val testParentEventId = "123"
+    fun `Request id and properties test`() {
+        val parentEventId = "123"
+        val metadataProperties = mapOf("abc" to "cde")
 
         val message = RawMessage.newBuilder().apply {
-            this.parentEventIdBuilder.id = testParentEventId
+            this.parentEventIdBuilder.id = parentEventId
             this.metadataBuilder.apply {
+                putAllProperties(metadataProperties)
                 this.timestamp = Instant.now().toTimestamp()
                 this.idBuilder.apply {
                     this.connectionId = ConnectionID.getDefaultInstance()
@@ -48,19 +51,22 @@ class ParentIDTest {
                 .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
         if (request is Th2RawHttpRequest) {
-            assertEquals(request.parentEventId, "123")
+            assertEquals(parentEventId, request.parentEventId)
+            assertEquals(metadataProperties, request.metadataProperties)
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }
     }
 
     @Test
-    fun `RawMessage to Request, to Response data, check parent id loss`() {
-        val testParentEventId = "123"
+    fun `RawMessage to Request, to Response data, check id or properties loss`() {
+        val parentEventId = "123"
+        val metadataProperties = mapOf("abc" to "cde")
 
         val message = RawMessage.newBuilder().apply {
-            this.parentEventIdBuilder.id = testParentEventId
+            this.parentEventIdBuilder.id = parentEventId
             this.metadataBuilder.apply {
+                putAllProperties(metadataProperties)
                 this.timestamp = Instant.now().toTimestamp()
                 this.idBuilder.apply {
                     this.connectionId = ConnectionID.getDefaultInstance()
@@ -91,7 +97,8 @@ class ParentIDTest {
         request = messageGroup.getGroups(0).toRequest()
 
         if (request is Th2RawHttpRequest) {
-            assertEquals(request.parentEventId, "123")
+            assertEquals(parentEventId, request.parentEventId)
+            assertTrue(request.metadataProperties.entries.containsAll(metadataProperties.entries))
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }
