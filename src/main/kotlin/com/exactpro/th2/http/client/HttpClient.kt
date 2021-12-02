@@ -16,6 +16,8 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.http.client.util.Certificate
+import com.exactpro.th2.http.client.util.getSocketFactory
 import mu.KotlinLogging
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
@@ -24,11 +26,9 @@ import rawhttp.core.client.TcpRawHttpClient
 import rawhttp.core.client.TcpRawHttpClient.DefaultOptions
 import java.net.Socket
 import java.net.URI
-import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.concurrent.locks.ReentrantLock
-import javax.net.ssl.SSLContext
-import javax.net.ssl.X509TrustManager
+import javax.net.SocketFactory
 import kotlin.concurrent.withLock
 
 class HttpClient(
@@ -43,8 +43,16 @@ class HttpClient(
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
     private val onStart: () -> Unit = {},
     private val onStop: () -> Unit = {},
-    validateCertificates: Boolean = true
-) : TcpRawHttpClient(ClientOptions(https, readTimeout, keepAliveTimeout, validateCertificates, onRequest)) {
+    validateCertificates: Boolean = true,
+    clientCertificate: Certificate? = null
+) : TcpRawHttpClient(
+    ClientOptions(
+        readTimeout,
+        keepAliveTimeout,
+        getSocketFactory(https, validateCertificates, clientCertificate),
+        onRequest
+    )
+) {
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
 
@@ -131,10 +139,9 @@ class HttpClient(
 }
 
 private class ClientOptions(
-    private val https: Boolean,
     private val readTimeout: Int,
     private val keepAliveTimeout: Long,
-    private val validateCertificates: Boolean,
+    private val socketFactory: SocketFactory,
     private val onRequest: (RawHttpRequest) -> Unit,
 ) : DefaultOptions() {
     private val logger = KotlinLogging.logger {}
@@ -153,10 +160,7 @@ private class ClientOptions(
         return super.onResponse(socket, uri, response)
     }
 
-    override fun createSocket(useHttps: Boolean, host: String, port: Int): Socket = when {
-        validateCertificates || !https -> super.createSocket(https, host, port)
-        else -> INSECURE_SOCKET_FACTORY.createSocket(host, port)
-    }
+    override fun createSocket(useHttps: Boolean, host: String, port: Int): Socket = socketFactory.createSocket(host, port)
 
     override fun getSocket(uri: URI): Socket = super.getSocket(uri).let { socket ->
         val currentTime = System.currentTimeMillis()
@@ -182,18 +186,5 @@ private class ClientOptions(
     fun removeSockets() = socketExpirationTimes.keys.removeIf {
         removeSocket(it)
         true
-    }
-
-    companion object {
-        private val INSECURE_TRUST_MANAGER = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
-            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-        }
-
-        private val INSECURE_SOCKET_FACTORY = SSLContext.getInstance("TLS").run {
-            init(null, arrayOf(INSECURE_TRUST_MANAGER), null)
-            socketFactory
-        }
     }
 }

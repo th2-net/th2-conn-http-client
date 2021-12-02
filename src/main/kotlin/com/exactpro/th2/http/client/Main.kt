@@ -38,14 +38,21 @@ import com.exactpro.th2.http.client.api.impl.AuthSettingsDeserializer
 import com.exactpro.th2.http.client.api.impl.BasicAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.impl.BasicRequestHandler
 import com.exactpro.th2.http.client.api.impl.BasicStateManager
+import com.exactpro.th2.http.client.util.Certificate
+import com.exactpro.th2.http.client.util.CertificateConverter
+import com.exactpro.th2.http.client.util.PrivateKeyConverter
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toPrettyString
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import mu.KotlinLogging
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
+import java.security.PrivateKey
+import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentLinkedDeque
@@ -138,7 +145,8 @@ fun run(
         onResponse,
         stateManager::onStart,
         stateManager::onStop,
-        settings.validateCertificates
+        settings.validateCertificates,
+        settings.certificate
     ).apply { registerResource("client", ::close) }
 
     stateManager.runCatching {
@@ -200,8 +208,18 @@ data class Settings(
     val defaultHeaders: Map<String, List<String>> = emptyMap(),
     val sessionAlias: String,
     val auth: IAuthSettings? = null,
-    val validateCertificates: Boolean = true
-)
+    val validateCertificates: Boolean = true,
+    @JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
+    @JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
+) {
+    @JsonIgnore val certificate: Certificate? = clientCertificate?.run {
+        requireNotNull(certificatePrivateKey) {
+            "'${::clientCertificate.name}' setting requires '${::certificatePrivateKey.name}' setting to be set"
+        }
+
+        Certificate(clientCertificate, certificatePrivateKey)
+    }
+}
 
 private inline fun <reified T> load(defaultImpl: Class<out T>): T {
     val instances = ServiceLoader.load(T::class.java).toList()
