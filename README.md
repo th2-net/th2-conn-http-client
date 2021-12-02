@@ -1,4 +1,4 @@
-# HTTP Client v0.3.0
+# HTTP Client v0.4.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -12,9 +12,11 @@ Main configuration is done via setting following properties in a custom configur
 + **readTimeout** - socket read timeout in ms (`5000` by default)
 + **keepAliveTimeout** - socket inactivity timeout in ms (`15000` by default)
 + **validateCertificates** - enables/disables server certificate validation (`true` by default)
++ **clientCertificate** - path to client X.509 certificate in PEM format (requires `certificatePrivateKey`, `null` by default)
++ **certificatePrivateKey** - path to client certificate RSA private key (PKCS8 encoded) in PEM format (`null` by default)
 + **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers are not affected, empty by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
-+ **auth** - basic authentication settings (empty by default)
++ **auth** - basic authentication settings (`null` by default)
 
 ### Authentication configuration
 
@@ -33,6 +35,8 @@ sessionAlias: api_session
 readTimeout: 5000
 keepAliveTimeout: 15000
 validateCertificates: true
+clientCertificate: /path/to/certificate
+certificatePrivateKey: /path/to/certificate/private/key
 defaultHeaders:
   x-api-key: [ 'apikeywashere' ]
 auth:
@@ -93,7 +97,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.3.0
+  image-version: 0.4.0
   custom-config:
     https: false
     host: 127.0.0.1
@@ -102,6 +106,8 @@ spec:
     readTimeout: 5000
     keepAliveTimeout: 15000
     validateCertificates: true
+    clientCertificate: /secret/storage/cert.crt
+    certificatePrivateKey: /secret/storage/private.key
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
     auth:
@@ -132,6 +138,12 @@ spec:
 ```
 
 ## Changelog
+
+### v0.4.0
+
+#### Added:
+
+* support for client-side certificate
 
 ### v0.3.0
 
