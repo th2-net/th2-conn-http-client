@@ -93,7 +93,7 @@ class PrivateKeyConverter : StdConverter<String, PrivateKey>() {
     override fun convert(path: String): PrivateKey = path.runCatching {
         File(path).loadPrivateKey()
     }.getOrElse {
-        throw IllegalArgumentException("Failed to load RSA private key from path: $path")
+        throw IllegalArgumentException("Failed to load RSA private key from path: $path", it)
     }
 }
 
