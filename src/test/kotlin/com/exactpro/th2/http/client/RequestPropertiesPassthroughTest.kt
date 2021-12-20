@@ -8,6 +8,7 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toBatch
+import com.exactpro.th2.http.client.util.toRawMessage
 import com.exactpro.th2.http.client.util.toRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -92,7 +93,7 @@ class RequestPropertiesPassthroughTest {
         )
         val connectionId = ConnectionID.newBuilder().setSessionAlias("testAlias").build()
 
-        val messageGroup = response.toBatch(connectionId, 0L, request)
+        val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
 
         request = messageGroup.getGroups(0).toRequest()
 
