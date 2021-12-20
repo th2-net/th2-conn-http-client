@@ -131,7 +131,11 @@ fun run(
         val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
 
         messageRouter.send(rawMessage.toBatch(), SECOND.toString())
-        eventRouter.storeEvent("Sent HTTP request", rawMessage.parentEventId.id.ifEmpty { rootEventId }, rawMessage.metadata.id)
+        eventRouter.storeEvent(
+            "Sent HTTP request",
+            if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId,
+            rawMessage.metadata.id
+        )
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
