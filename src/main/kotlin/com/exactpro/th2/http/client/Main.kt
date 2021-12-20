@@ -35,11 +35,17 @@ import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.api.IStateManager
 import com.exactpro.th2.http.client.api.IStateManager.StateManagerContext
+import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.api.impl.AuthSettingsDeserializer
 import com.exactpro.th2.http.client.api.impl.BasicAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.impl.BasicRequestHandler
 import com.exactpro.th2.http.client.api.impl.BasicStateManager
-import com.exactpro.th2.http.client.util.*
+import com.exactpro.th2.http.client.util.Certificate
+import com.exactpro.th2.http.client.util.CertificateConverter
+import com.exactpro.th2.http.client.util.PrivateKeyConverter
+import com.exactpro.th2.http.client.util.toBatch
+import com.exactpro.th2.http.client.util.toPrettyString
+import com.exactpro.th2.http.client.util.toRawMessage
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
@@ -124,16 +130,12 @@ fun run(
     val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
         val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
 
-        messageRouter.send(request.toRawMessage(connectionId, outgoingSequence()).toBatch(), SECOND.toString())
-        eventRouter.storeEvent("Sent HTTP request", rootEventId, listOf(rawMessage.metadata.id))
+        messageRouter.send(rawMessage.toBatch(), SECOND.toString())
+        eventRouter.storeEvent("Sent HTTP request", rawMessage.parentEventId.id.ifEmpty { rootEventId }, rawMessage.metadata.id)
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        val rawMessage = response.toRawMessage(connectionId, incomingSequence(), request)
-
-        messageRouter.send(rawMessage.toBatch(), FIRST.toString())
-        eventRouter.storeEvent("Received HTTP response", rootEventId, listOf(rawMessage.metadata.id))
-
+        messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), request).toBatch(), FIRST.toString())
         stateManager.onResponse(response)
     }
 
@@ -240,7 +242,7 @@ private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
 
-private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, messagesId: List<MessageID>? = null) : String {
+private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, messageId: MessageID) : String {
     val type = "Info"
     val status = Event.Status.PASSED
     val event = Event.start().apply {
@@ -249,7 +251,7 @@ private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, 
         type(type)
         status(status)
 
-        messagesId?.forEach(this::messageID)
+        messageID(messageId)
     }
 
     storeEvent(event, eventId)
