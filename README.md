@@ -143,7 +143,7 @@ spec:
 
 #### Added:
 
-*  publish "sent" events for incoming messages
+*  publish "sent" events for outgoing messages (requests)
 
 ### v0.4.0
 
