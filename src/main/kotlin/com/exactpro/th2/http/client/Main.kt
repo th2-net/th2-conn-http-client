@@ -22,6 +22,7 @@ import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.MessageGroupBatch
+import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
@@ -34,6 +35,7 @@ import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.api.IStateManager
 import com.exactpro.th2.http.client.api.IStateManager.StateManagerContext
+import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import com.exactpro.th2.http.client.api.impl.AuthSettingsDeserializer
 import com.exactpro.th2.http.client.api.impl.BasicAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.impl.BasicRequestHandler
@@ -43,6 +45,7 @@ import com.exactpro.th2.http.client.util.CertificateConverter
 import com.exactpro.th2.http.client.util.PrivateKeyConverter
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toPrettyString
+import com.exactpro.th2.http.client.util.toRawMessage
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
@@ -124,12 +127,19 @@ fun run(
     val incomingSequence = createSequence()
     val outgoingSequence = createSequence()
 
-    val onRequest = { request: RawHttpRequest ->
-        messageRouter.send(request.toBatch(connectionId, outgoingSequence()), SECOND.toString())
+    val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
+        val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
+
+        messageRouter.send(rawMessage.toBatch(), SECOND.toString())
+        eventRouter.storeEvent(
+            "Sent HTTP request",
+            if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId,
+            rawMessage.metadata.id
+        )
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageRouter.send(response.toBatch(connectionId, incomingSequence(), request), FIRST.toString())
+        messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), request).toBatch(), FIRST.toString())
         stateManager.onResponse(response)
     }
 
@@ -235,3 +245,20 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
 private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
+
+private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, messageId: MessageID) : String {
+    val type = "Info"
+    val status = Event.Status.PASSED
+    val event = Event.start().apply {
+        endTimestamp()
+        name(name)
+        type(type)
+        status(status)
+
+        messageID(messageId)
+    }
+
+    storeEvent(event, eventId)
+
+    return event.id
+}

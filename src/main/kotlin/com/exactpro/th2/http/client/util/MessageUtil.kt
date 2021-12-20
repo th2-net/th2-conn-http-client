@@ -138,12 +138,12 @@ private inline operator fun <T : Builder> T.invoke(block: T.() -> Unit) = apply(
 
 fun MessageOrBuilder.toPrettyString(): String = JsonFormat.printer().omittingInsignificantWhitespace().includingDefaultValueFields().print(this)
 
-private fun RawMessage.Builder.toBatch() = run(AnyMessage.newBuilder()::setRawMessage)
+fun RawMessage.Builder.toBatch() = run(AnyMessage.newBuilder()::setRawMessage)
     .run(MessageGroup.newBuilder()::addMessages)
     .run(MessageGroupBatch.newBuilder()::addGroups)
     .build()
 
-private fun ByteArrayOutputStream.toBatch(
+private fun ByteArrayOutputStream.toRawMessage(
     connectionId: ConnectionID,
     direction: Direction,
     sequence: Long,
@@ -161,9 +161,9 @@ private fun ByteArrayOutputStream.toBatch(
             this.sequence = sequence
         }
     }
-}.toBatch()
+}
 
-private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): MessageGroupBatch {
+private fun HttpMessage.toRawMessage(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): RawMessage.Builder {
     val (metadataProperties, parentEventId) = when (request) {
         is Th2RawHttpRequest -> request.metadataProperties.toMutableMap() to request.parentEventId
         else -> mutableMapOf<String, String>() to null
@@ -180,9 +180,9 @@ private fun HttpMessage.toBatch(connectionId: ConnectionID, direction: Direction
         startLine.writeTo(this)
         headers.writeTo(this)
         body.ifPresent { it.writeTo(this) }
-        toBatch(connectionId, direction, sequence, metadataProperties, parentEventId)
+        toRawMessage(connectionId, direction, sequence, metadataProperties, parentEventId)
     }
 }
 
-fun RawHttpRequest.toBatch(connectionId: ConnectionID, sequence: Long): MessageGroupBatch = toBatch(connectionId, SECOND, sequence, this)
-fun RawHttpResponse<*>.toBatch(connectionId: ConnectionID, sequence: Long, request: RawHttpRequest): MessageGroupBatch = toBatch(connectionId, FIRST, sequence, request)
+fun RawHttpRequest.toRawMessage(connectionId: ConnectionID, sequence: Long): RawMessage.Builder = toRawMessage(connectionId, SECOND, sequence, this)
+fun RawHttpResponse<*>.toRawMessage(connectionId: ConnectionID, sequence: Long, request: RawHttpRequest): RawMessage.Builder = toRawMessage(connectionId, FIRST, sequence, request)
