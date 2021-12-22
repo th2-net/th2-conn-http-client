@@ -164,7 +164,6 @@ dependencies {
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
     implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
     implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
-    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
 
     testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'
