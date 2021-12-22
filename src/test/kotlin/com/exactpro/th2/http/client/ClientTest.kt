@@ -1,5 +1,6 @@
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.http.client.api.Th2RawHttpRequest
 import java.net.URI
 import java.util.Optional
 import mu.KotlinLogging
@@ -51,8 +52,18 @@ class ClientTest {
 
     @Test
     fun `Simple response test`() {
+        val parentEventID = "testParentId"
+        val metadata = mapOf( "propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
+
+        var newParentID = ""
+        var newMetadata = mapOf<String, String>()
+
         val prepareRequest = { request : RawHttpRequest ->  request}
-        val onRequest = { request : RawHttpRequest ->  LOGGER.debug("Request submitted: $request") }
+        val onRequest = { request : RawHttpRequest ->
+            LOGGER.debug("Request submitted: $request")
+            newMetadata = (request as Th2RawHttpRequest).metadataProperties
+            newParentID = request.parentEventId
+        }
         val onResponse = { _ : RawHttpRequest, response : RawHttpResponse<*> ->
             LOGGER.debug("Response handled: $response")
         }
@@ -61,7 +72,7 @@ class ClientTest {
             serverPort, 20000, 5000, emptyMap(), prepareRequest, onRequest, onResponse)
 
         val requestLine =  RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
-        val request  = RawHttpRequest( requestLine, RawHttpHeaders.CONTENT_LENGTH_ZERO, null, null)
+        val request  = Th2RawHttpRequest( requestLine, RawHttpHeaders.CONTENT_LENGTH_ZERO, null, null, parentEventID, metadata)
 
         val response = client.send(request)
 
@@ -70,5 +81,12 @@ class ClientTest {
         Assertions.assertEquals("plain/text", response.headers["Content-Type"][0])
         Assertions.assertEquals(responseBody.length.toString(), response.headers["Content-Length"][0])
         Assertions.assertEquals(responseBody, response.body.get().toString())
+
+        Assertions.assertEquals(metadata.values.size /* method and uri */, newMetadata.values.size)
+        metadata.forEach {
+            Assertions.assertTrue(newMetadata.containsKey(it.key))
+            Assertions.assertEquals(it.value, newMetadata[it.key])
+        }
+        Assertions.assertEquals(parentEventID, newParentID)
     }
 }

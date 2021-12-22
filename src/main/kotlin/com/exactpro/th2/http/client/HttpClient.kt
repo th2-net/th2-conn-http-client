@@ -148,10 +148,9 @@ private class ClientOptions(
     private val socketExpirationTimes = mutableMapOf<Socket, Long>()
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
-        val request = httpRequest.eagerly()
-        logger.debug { "Sent request: $request" }
-        request.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
-        return super.onRequest(request)
+        logger.debug { "Sent request: $httpRequest" }
+        httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
+        return super.onRequest(httpRequest)
     }
 
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): RawHttpResponse<Void> {
