@@ -1,5 +1,6 @@
 package com.exactpro.th2.http.client.api
 
+import rawhttp.core.EagerHttpRequest
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RequestLine
@@ -56,4 +57,12 @@ class Th2RawHttpRequest(
         parentEventId,
         metadataProperties
     )
+
+    override fun eagerly(): EagerHttpRequest {
+        throw UnsupportedOperationException("Unsupported eagerly call of request. It's client side, no need to eager request")
+    }
 }
+
+
+
+
