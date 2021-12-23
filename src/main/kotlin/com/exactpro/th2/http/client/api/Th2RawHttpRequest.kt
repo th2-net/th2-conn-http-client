@@ -59,7 +59,7 @@ class Th2RawHttpRequest(
     )
 
     override fun eagerly(): EagerHttpRequest {
-        error("Unsupported eagerly call of request. It's client side, no need to eager request")
+        throw UnsupportedOperationException("Unsupported eagerly call of request. It's client side, no need to eager request")
     }
 }
 
