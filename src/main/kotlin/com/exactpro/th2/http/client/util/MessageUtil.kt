@@ -41,7 +41,10 @@ import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.RequestLine
-import rawhttp.core.body.BytesBody
+import rawhttp.core.body.BodyDecoder
+import rawhttp.core.body.EagerBodyReader
+import rawhttp.core.body.FramedBody.ContentLength
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.time.Instant
@@ -94,7 +97,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
             httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
         }
 
-        BytesBody(this).toBodyReader().eager()
+        EagerBodyReader(ContentLength(BodyDecoder(), this.size.toLong()), ByteArrayInputStream(this))
     }
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
