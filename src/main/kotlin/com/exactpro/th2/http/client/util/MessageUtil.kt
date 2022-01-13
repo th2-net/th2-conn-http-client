@@ -30,7 +30,7 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.getList
 import com.exactpro.th2.common.message.getString
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.http.client.api.Th2RawHttpRequest
+import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder
@@ -62,7 +62,7 @@ private const val DEFAULT_METHOD = "GET"
 private const val DEFAULT_URI = "/"
 
 private const val CONTENT_TYPE_HEADER = "Content-Type"
-private const val CONTENT_LENGTH_HEADER = "Content-Length"
+const val CONTENT_LENGTH_HEADER = "Content-Length"
 private const val HEADER_VALUE_SEPARATOR = ";"
 
 private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
@@ -94,7 +94,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
             httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
         }
 
-        BytesBody(this).toBodyReader()
+        BytesBody(this).toBodyReader().eager()
     }
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }

@@ -22,7 +22,7 @@ import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.http.client.api.Th2RawHttpRequest
+import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toRawMessage
 import com.exactpro.th2.http.client.util.toRequest
