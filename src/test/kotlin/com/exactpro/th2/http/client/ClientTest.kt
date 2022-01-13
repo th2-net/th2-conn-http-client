@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.http.client
 
-import com.exactpro.th2.http.client.api.Th2RawHttpRequest
+import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.CONTENT_LENGTH_HEADER
 import java.net.URI
 import java.util.Optional
@@ -25,7 +25,6 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.fail
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
@@ -106,11 +105,11 @@ class ClientTest {
         Assertions.assertEquals(body.length.toString(), response.headers["Content-Length"][0])
         Assertions.assertEquals(body, response.body.get().toString())
 
-//        Assertions.assertEquals(metadata.values.size /* method and uri */, newMetadata.values.size)
-//        metadata.forEach {
-//            Assertions.assertTrue(newMetadata.containsKey(it.key))
-//            Assertions.assertEquals(it.value, newMetadata[it.key])
-//        }
-//        Assertions.assertEquals(parentEventID, newParentID)
+        Assertions.assertEquals(metadata.values.size /* method and uri */, newMetadata.values.size)
+        metadata.forEach {
+            Assertions.assertTrue(newMetadata.containsKey(it.key))
+            Assertions.assertEquals(it.value, newMetadata[it.key])
+        }
+        Assertions.assertEquals(parentEventID, newParentID)
     }
 }

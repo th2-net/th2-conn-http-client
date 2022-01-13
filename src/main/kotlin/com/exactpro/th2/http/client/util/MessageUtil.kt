@@ -30,7 +30,7 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.getList
 import com.exactpro.th2.common.message.getString
 import com.exactpro.th2.common.message.toTimestamp
-import com.exactpro.th2.http.client.api.Th2RawHttpRequest
+import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder

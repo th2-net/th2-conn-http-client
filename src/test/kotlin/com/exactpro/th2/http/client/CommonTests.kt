@@ -17,7 +17,7 @@
 package com.exactpro.th2.http.client
 
 import com.exactpro.th2.common.grpc.ConnectionID
-import com.exactpro.th2.http.client.api.Th2RawHttpRequest
+import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toRawMessage
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
