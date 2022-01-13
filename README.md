@@ -143,7 +143,7 @@ spec:
 
 #### Fixed:
 
-*  fixed bug with not sending body filled requests
+*  fixed bug with not sending all requests with body
 
 ### v0.5.1
 
