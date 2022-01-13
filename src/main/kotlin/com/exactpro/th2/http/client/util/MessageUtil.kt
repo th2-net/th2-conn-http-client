@@ -62,7 +62,7 @@ private const val DEFAULT_METHOD = "GET"
 private const val DEFAULT_URI = "/"
 
 private const val CONTENT_TYPE_HEADER = "Content-Type"
-private const val CONTENT_LENGTH_HEADER = "Content-Length"
+const val CONTENT_LENGTH_HEADER = "Content-Length"
 private const val HEADER_VALUE_SEPARATOR = ";"
 
 private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {

@@ -58,9 +58,9 @@ class Th2RawHttpRequest(
         metadataProperties
     )
 
-    override fun eagerly(): EagerHttpRequest {
-        throw UnsupportedOperationException("Unsupported eagerly call of request. It's client side, no need to eager request")
-    }
+//    override fun eagerly(): EagerHttpRequest {
+//        throw UnsupportedOperationException("Unsupported eagerly call of request. It's client side, no need to eager request")
+//    }
 }
 
 
