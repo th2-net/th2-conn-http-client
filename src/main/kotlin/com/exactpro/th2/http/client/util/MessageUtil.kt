@@ -94,7 +94,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
             httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
         }
 
-        BytesBody(this).toBodyReader()
+        BytesBody(this).toBodyReader().eager()
     }
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
