@@ -19,14 +19,20 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
 import mu.KotlinLogging
+import rawhttp.core.HttpVersion
+import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
 import rawhttp.core.client.TcpRawHttpClient.DefaultOptions
+import java.io.IOException
 import java.net.Socket
 import java.net.URI
 import java.time.Instant
+import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
 import kotlin.concurrent.withLock
@@ -55,6 +61,9 @@ class HttpClient(
 ) {
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
+
+    private val rawHttp = RawHttp()
+
 
     @Volatile var isRunning: Boolean = false
         private set
@@ -114,10 +123,17 @@ class HttpClient(
             }
         }
 
+        val finalRequest = options.onRequest(preparedRequest)
+        val socket: Socket = finalRequest.uri.runCatching(options::getSocket).getOrElse {
+            when (it) {
+                is IOException -> throw IOException("Can't handle socket by uri: ${finalRequest.uri}", it)
+                else -> throw it
+            }
+        }
+
         val response = runCatching {
-            super.send(preparedRequest)
+            send(finalRequest, socket)
         }.getOrElse { cause ->
-            val socket = options.getSocket(preparedRequest.uri)
             logger.error(cause) { "Removing socket due to network error: $socket" }
             options.removeSocket(socket)
             throw cause
@@ -130,6 +146,35 @@ class HttpClient(
         }
 
         return response
+    }
+
+    private fun send(request: RawHttpRequest, socket: Socket): RawHttpResponse<Void> {
+        val expectContinue = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1) && request.expectContinue()
+
+        val outputStream = socket.getOutputStream()
+        val inputStream = socket.getInputStream()
+
+        options.executorService.submit(requestSender(request, outputStream, expectContinue))
+
+        val response: RawHttpResponse<Void> = if (expectContinue) {
+            val responseWaiter = ResponseCache { rawHttp.parseResponse(inputStream, request.startLine) }
+            if (options.shouldContinue(responseWaiter)) {
+                request.body.get().writeTo(outputStream)
+                if (!responseWaiter.cached.get()) responseWaiter.call() else responseWaiter.response
+            } else {
+                throw RuntimeException("Unable to obtain a response due to a 100-continue, request not being continued")
+            }
+        } else {
+            rawHttp.parseResponse(inputStream, request.startLine)
+        }
+
+        return if (response.statusCode == 100) {
+            // 100-Continue: ignore the first response, then expect a new one...
+            options.onResponse(socket, request.uri, response)
+            options.onResponse(socket, request.uri, rawHttp.parseResponse(socket.getInputStream(), request.startLine))
+        } else {
+            options.onResponse(socket, request.uri, response)
+        }
     }
 
     override fun close() {
@@ -182,8 +227,27 @@ private class ClientOptions(
         socketExpirationTimes -= socket
     }
 
+    override fun shouldContinue(waitForHttpResponse: Callable<RawHttpResponse<Void>>): Boolean {
+        return executorService.submit(waitForHttpResponse).runCatching {
+            val response = this[5, TimeUnit.SECONDS]
+            response.statusCode == 100 || response.statusCode in 200..399
+        }.onFailure { logger.error(it) {} }.getOrElse { false }
+    }
+
     fun removeSockets() = socketExpirationTimes.keys.removeIf {
         removeSocket(it)
         true
+    }
+}
+
+private class ResponseCache constructor(private val readResponse: () -> RawHttpResponse<Void>) : Callable<RawHttpResponse<Void>?> {
+    val cached = AtomicBoolean(false)
+
+    @Volatile
+    lateinit var response: RawHttpResponse<Void>
+
+    override fun call(): RawHttpResponse<Void> = when {
+        cached.compareAndSet(false, true) -> readResponse().also { response = it }
+        else -> error("Cannot receive HTTP Request more than once")
     }
 }
