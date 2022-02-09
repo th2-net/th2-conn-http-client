@@ -143,26 +143,25 @@ spec:
 
 #### Fixed:
 
-*  all http methods from incoming message groups will be processed with upper case
-
+* Convert method from incoming message group to uppercase for better compatibility with some servers
 
 ### v0.5.2
 
 #### Fixed:
 
-*  fixed bug with not sending all requests with body
+* fixed bug with not sending all requests with body
 
 ### v0.5.1
 
 #### Fixed:
 
-*  fixed bug with parent id loss inside client after sending request
+* fixed bug with parent id loss inside client after sending request
 
 ### v0.5.0
 
 #### Added:
 
-*  publish "sent" events for outgoing messages (requests)
+* publish "sent" events for outgoing messages (requests)
 
 ### v0.4.0
 
