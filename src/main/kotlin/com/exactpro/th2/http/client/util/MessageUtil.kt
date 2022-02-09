@@ -67,7 +67,7 @@ private const val HEADER_VALUE_SEPARATOR = ";"
 
 private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     val metadata = body.metadata.propertiesMap
-    val method = head.getString(METHOD_FIELD) ?: metadata[METHOD_PROPERTY] ?: DEFAULT_METHOD
+    val method = (head.getString(METHOD_FIELD) ?: metadata[METHOD_PROPERTY])?.uppercase() ?: DEFAULT_METHOD
     val uri = head.getString(URI_FIELD) ?: metadata[URI_PROPERTY] ?: DEFAULT_URI
 
     val httpRequestLine = RequestLine(method, URI(uri), HTTP_1_1)
