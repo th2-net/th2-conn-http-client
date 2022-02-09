@@ -1,4 +1,4 @@
-# HTTP Client v0.5.2
+# HTTP Client v0.5.3
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -97,7 +97,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.5.2
+  image-version: 0.5.3
   custom-config:
     https: false
     host: 127.0.0.1
@@ -139,23 +139,29 @@ spec:
 
 ## Changelog
 
+### v0.5.3
+
+#### Fixed:
+
+* Convert method from incoming message group to uppercase for better compatibility with some servers
+
 ### v0.5.2
 
 #### Fixed:
 
-*  fixed bug with not sending all requests with body
+* fixed bug with not sending all requests with body
 
 ### v0.5.1
 
 #### Fixed:
 
-*  fixed bug with parent id loss inside client after sending request
+* fixed bug with parent id loss inside client after sending request
 
 ### v0.5.0
 
 #### Added:
 
-*  publish "sent" events for outgoing messages (requests)
+* publish "sent" events for outgoing messages (requests)
 
 ### v0.4.0
 
