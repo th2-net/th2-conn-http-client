@@ -20,6 +20,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.MessageGroupBatch
 import com.exactpro.th2.common.grpc.MessageID
@@ -50,12 +51,14 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.prometheus.client.Counter
 import mu.KotlinLogging
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.time.Instant
+import java.util.EnumMap
 import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.TimeUnit.SECONDS
@@ -126,10 +129,24 @@ fun run(
     val incomingSequence = createSequence()
     val outgoingSequence = createSequence()
 
+    val counters: Map<Direction, Counter.Child> = EnumMap<Direction, Counter.Child>(Direction::class.java).apply {
+        put(Direction.FIRST, Counter.build().apply {
+            name("th2_conn_incoming_msg_quantity")
+            labelNames("session_alias")
+            help("Quantity of incoming messages to conn")
+        }.register().labels(settings.sessionAlias))
+        put(Direction.SECOND, Counter.build().apply {
+            name("th2_conn_outgoing_msg_quantity")
+            labelNames("session_alias")
+            help("Quantity of outgoing messages from conn")
+        }.register().labels(settings.sessionAlias))
+    }
+
     val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
         val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
 
         messageRouter.send(rawMessage.toBatch(), SECOND.toString())
+        counters[Direction.SECOND]!!.inc()
         eventRouter.storeEvent(
             "Sent HTTP request",
             if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId,
@@ -139,6 +156,7 @@ fun run(
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
         messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), request).toBatch(), FIRST.toString())
+        counters[Direction.FIRST]!!.inc()
         stateManager.onResponse(response)
     }
 

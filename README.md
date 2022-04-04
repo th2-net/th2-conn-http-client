@@ -140,6 +140,12 @@ spec:
 
 ## Changelog
 
+### v0.6.0
+
+#### Added:
+
+* Prometheus metrics for first and second directions
+
 ### v0.5.3
 
 #### Fixed:
