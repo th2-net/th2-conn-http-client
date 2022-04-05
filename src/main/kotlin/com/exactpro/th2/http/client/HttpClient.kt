@@ -150,7 +150,6 @@ private class ClientOptions(
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
         logger.debug { "Sent request: $httpRequest" }
-        logger.debug { "Body: ${httpRequest.body.orElseGet(null)?.decodeBodyToString(Charset.forName("UTF-8"))}" }
         httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
         return super.onRequest(httpRequest)
     }
@@ -158,7 +157,6 @@ private class ClientOptions(
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): RawHttpResponse<Void> {
         val response = httpResponse.eagerly()
         logger.debug { "Received response: $response" }
-        logger.debug { "Body: ${response.body.orElseGet(null)?.decodeBodyToString(Charset.forName("UTF-8"))}" }
         return super.onResponse(socket, uri, response)
     }
 
