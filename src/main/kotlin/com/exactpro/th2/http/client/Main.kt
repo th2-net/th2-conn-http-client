@@ -115,9 +115,8 @@ fun run(
         type("Microservice")
     }).id
 
-    val generateSequence = Instant.now().run {
-        AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
-    }::incrementAndGet
+    val incomingSequence = createSequence()
+    val outgoingSequence = createSequence()
 
     val counters: Map<Direction, Counter.Child> = EnumMap<Direction, Counter.Child>(Direction::class.java).apply {
         put(Direction.FIRST, Counter.build().apply {
@@ -133,12 +132,12 @@ fun run(
     }
 
     val onRequest = { request: RawHttpRequest ->
-        messageRouter.send(request.toBatch(connectionId, generateSequence()), SECOND.toString())
+        messageRouter.send(request.toBatch(connectionId, outgoingSequence()), SECOND.toString())
         counters[Direction.SECOND]!!.inc()
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageRouter.send(response.toBatch(connectionId, generateSequence(), request), FIRST.toString())
+        messageRouter.send(response.toBatch(connectionId, incomingSequence(), request), FIRST.toString())
         stateManager.onResponse(response)
         counters[Direction.FIRST]!!.inc()
     }
@@ -192,8 +191,11 @@ fun run(
     }
 
     LOGGER.info { "Successfully started" }
-    @Suppress("ControlFlowWithEmptyBody")
-    while (client.isRunning);
+
+    while (client.isRunning) {
+        Thread.sleep(1000)
+    }
+
     LOGGER.info { "Finished running" }
 }
 
@@ -218,3 +220,7 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
         else -> error("More than 1 non-default instance of ${T::class.simpleName} has been found: $instances")
     }
 }
+
+private fun createSequence(): () -> Long = Instant.now().run {
+    AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
+}::incrementAndGet

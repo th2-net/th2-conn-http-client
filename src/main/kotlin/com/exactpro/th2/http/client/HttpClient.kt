@@ -111,7 +111,6 @@ private class ClientOptions(
         socketExpirationTimes[socket]?.let { expirationTime ->
             if (currentTime > expirationTime) {
                 logger.debug { "Removing inactive socket: $socket (expired at: ${Instant.ofEpochMilli(expirationTime)})" }
-                socketExpirationTimes -= socket
                 socket.runCatching { close() }
                 removeSocket(socket)
                 return getSocket(uri)
@@ -123,6 +122,7 @@ private class ClientOptions(
     }
 
     override fun removeSocket(socket: Socket) {
+        super.removeSocket(socket)
         socketExpirationTimes -= socket
     }
 }
