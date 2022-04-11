@@ -76,7 +76,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
         require(it.hasMessageValue()) { "Item of '$HEADERS_FIELD' field list is not a message: ${it.toPrettyString()}" }
         val message = it.messageValue
         val name = message.getString(HEADER_NAME_FIELD) ?: error("Header message has no $HEADER_NAME_FIELD field: ${message.toPrettyString()}")
-        val value = message.getString(HEADER_NAME_FIELD) ?: error("Header message has no $HEADER_VALUE_FIELD field: ${message.toPrettyString()}")
+        val value = message.getString(HEADER_VALUE_FIELD) ?: error("Header message has no $HEADER_VALUE_FIELD field: ${message.toPrettyString()}")
         httpHeaders.with(name, value)
     }
 
