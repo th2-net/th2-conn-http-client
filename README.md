@@ -1,4 +1,4 @@
-# HTTP Client v1.0.0
+# HTTP Client v0.5.2
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -120,6 +120,7 @@ spec:
       attributes:
         - subscribe
         - send
+        - group
     - name: out_request
       connection-type: mq
       attributes:
@@ -145,23 +146,29 @@ spec:
 
 * multi socket behavior
 
+### v0.5.3
+
+#### Fixed:
+
+* Convert method from incoming message group to uppercase for better compatibility with some servers
+
 ### v0.5.2
 
 #### Fixed:
 
-*  fixed bug with not sending all requests with body
+* fixed bug with not sending all requests with body
 
 ### v0.5.1
 
 #### Fixed:
 
-*  fixed bug with parent id loss inside client after sending request
+* fixed bug with parent id loss inside client after sending request
 
 ### v0.5.0
 
 #### Added:
 
-*  publish "sent" events for outgoing messages (requests)
+* publish "sent" events for outgoing messages (requests)
 
 ### v0.4.0
 
