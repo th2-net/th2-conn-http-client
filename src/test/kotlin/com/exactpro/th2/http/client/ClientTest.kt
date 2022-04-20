@@ -38,7 +38,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import javax.swing.text.html.HTML.Attribute.N
 
 
 class ClientTest {
@@ -131,7 +130,7 @@ class ClientTest {
     fun `multiple response test`() {
         val executor = Executors.newCachedThreadPool()
 
-        doneSignal = CountDownLatch(25)
+        doneSignal = CountDownLatch(5)
 
         val parentEventID = "testParentId"
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
