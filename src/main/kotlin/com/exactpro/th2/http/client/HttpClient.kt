@@ -19,16 +19,10 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
 import mu.KotlinLogging
-import rawhttp.core.HttpVersion
-import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
-import java.io.IOException
-import java.net.Socket
-import java.util.concurrent.Callable
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -53,15 +47,13 @@ class HttpClient(
         keepAliveTimeout,
         getSocketFactory(https, validateCertificates, clientCertificate),
         socketCapacity,
+        host,
+        port,
         onRequest
     )
 ) {
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
-
-    private val rawHttp = RawHttp()
-    private val clientOptions = options as ClientOptions
-
 
     @Volatile var isRunning: Boolean = false
         private set
@@ -87,7 +79,7 @@ class HttpClient(
             else -> {
                 logger.info { "Stopping client" }
                 runCatching(onStop).onFailure { logger.error(it) { "Failed to execute onStop hook" } }
-                clientOptions.removeSockets()
+                options.close()
                 isRunning = false
                 logger.info { "Stopped client" }
             }
@@ -121,23 +113,12 @@ class HttpClient(
             }
         }
 
-        val finalRequest = options.onRequest(preparedRequest)
-        val socket: Socket = finalRequest.uri.runCatching(clientOptions::getAndLockSocket).getOrElse {
-            when (it) {
-                is IOException -> throw IOException("Can't handle socket by uri: ${finalRequest.uri}", it)
-                else -> throw it
-            }
-        }
-
         val response = runCatching {
-            send(finalRequest, socket)
+            super.send(preparedRequest)
         }.getOrElse { cause ->
-            logger.error(cause) { "Removing socket due to network error: $socket" }
-            options.removeSocket(socket)
+            logger.error { "Cannot send request due error: ${cause.message}" }
             throw cause
         }
-
-        clientOptions.freeSocket(socket)
 
         response.runCatching {
             onResponse(preparedRequest, response)
@@ -148,56 +129,9 @@ class HttpClient(
         return response
     }
 
-    private fun send(request: RawHttpRequest, socket: Socket): RawHttpResponse<Void> {
-        val expectContinue = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1) && request.expectContinue()
-
-        val outputStream = socket.getOutputStream()
-        val inputStream = socket.getInputStream()
-
-        options.executorService.submit(requestSender(request, outputStream, expectContinue))
-
-        val response: RawHttpResponse<Void> = if (expectContinue) {
-            val responseWaiter = ResponseCache { rawHttp.parseResponse(inputStream, request.startLine) }
-            if (options.shouldContinue(responseWaiter)) {
-                request.body.get().writeTo(outputStream)
-                if (!responseWaiter.cached.get()) responseWaiter.call() else responseWaiter.response
-            } else {
-                throw RuntimeException("Unable to obtain a response due to a 100-continue, request not being continued")
-            }
-        } else {
-            rawHttp.parseResponse(inputStream, request.startLine)
-        }.let {
-            if (RawHttpResponse.shouldCloseConnectionAfter(it)) {
-                options.removeSocket(socket)
-                it.eagerly(false)
-            } else {
-                it.eagerly()
-            }
-        }
-
-        return if (response.statusCode == 100) {
-            // 100-Continue: ignore the first response, then expect a new one...
-            options.onResponse(socket, request.uri, response)
-            options.onResponse(socket, request.uri, rawHttp.parseResponse(socket.getInputStream(), request.startLine))
-        } else {
-            options.onResponse(socket, request.uri, response)
-        }
-    }
-
     override fun close() {
         if (isRunning) stop()
         super.close()
     }
 }
 
-private class ResponseCache constructor(private val readResponse: () -> RawHttpResponse<Void>) : Callable<RawHttpResponse<Void>?> {
-    val cached = AtomicBoolean(false)
-
-    @Volatile
-    lateinit var response: RawHttpResponse<Void>
-
-    override fun call(): RawHttpResponse<Void> = when {
-        cached.compareAndSet(false, true) -> readResponse().also { response = it }
-        else -> error("Cannot receive HTTP Request more than once")
-    }
-}

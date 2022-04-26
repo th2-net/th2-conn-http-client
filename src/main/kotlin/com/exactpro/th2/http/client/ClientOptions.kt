@@ -17,15 +17,17 @@
 package com.exactpro.th2.http.client
 
 import mu.KotlinLogging
+import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
-import java.io.IOException
+import java.io.Closeable
 import java.net.Socket
 import java.net.URI
-import java.time.Instant
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
@@ -33,96 +35,49 @@ import kotlin.concurrent.withLock
 
 internal class ClientOptions(
     private val readTimeout: Int,
-    private val keepAliveTimeout: Long,
+    keepAliveTimeout: Long,
     private val socketFactory: SocketFactory,
     socketCapacity: Int,
+    host: String,
+    port: Int,
     private val onRequest: (RawHttpRequest) -> Unit,
 ) : TcpRawHttpClient.DefaultOptions() {
     private val logger = KotlinLogging.logger {}
-    private val socketExpirationTimes = mutableMapOf<Socket, Long>()
     private val lock = ReentrantLock()
 
-    private val socketsReady: MutableMap<Socket, Boolean> = ConcurrentHashMap(socketCapacity)
-
-
-    override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
-        logger.info { "onRequest: $httpRequest" }
-        httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
-        return super.onRequest(httpRequest)
+    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, socketCapacity) { host, port ->
+        createSocket(true, host, port)
     }
 
-    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): RawHttpResponse<Void> {
-        logger.debug { "onResponse: $socket: $uri" }
+    override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
+        logger.info { "Sending request: $httpRequest" }
+        httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
+        return httpRequest
+    }
 
-        val response = httpResponse.eagerly()
-        logger.info { "Received response: $socket: $response" }
-        return response
+    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> =  try {
+        httpResponse.eagerly()
+    } catch (e: Throwable) {
+        throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
+    }.also {
+        logger.info { "Received response on socket '$socket': $it" }
+        if (RawHttpResponse.shouldCloseConnectionAfter(it)) {
+            removeSocket(socket)
+        } else {
+            socketPool.release(socket)
+        }
     }
 
     override fun createSocket(useHttps: Boolean, host: String, port: Int): Socket = lock.withLock {
         socketFactory.createSocket(host, port).also {
+            it.soTimeout = readTimeout
             logger.debug { "Created socket $it" }
         }
     }
 
-    private fun createOrGetSocket(uri: URI): Socket  {
-        val host = checkNotNull(uri.host) { "Host is not available in the URI" }
-        var socket = socketsReady.entries.firstOrNull { it.value }?.key
+    override fun getSocket(uri: URI): Socket = socketPool.acquire()
 
-        if (socket != null && (socket.isClosed || !socket.isConnected)) {
-            socketsReady.remove(socket)
-            socket = null
-        }
-
-        if (socket == null) {
-            val useHttps = "https".equals(uri.scheme, ignoreCase = true)
-            val port = when {
-                uri.port < 1 -> if (useHttps) 443 else 80
-                else -> uri.port
-            }
-            socket = checkNotNull(try {
-                createSocket(useHttps, host, port).apply {
-                    soTimeout = 5000
-                }
-            } catch (e: IOException) {
-                throw RuntimeException(e)
-            }) { "Socket wasn't initialized" }
-
-            socketsReady[socket] = true
-        }
-        return socket
-    }
-
-    fun getAndLockSocket(uri: URI): Socket = getSocket(uri).also {
-        socketsReady[it] = false
-        logger.debug { "Socked was locked $it" }
-    }
-
-    fun freeSocket(socket: Socket) {
-        socketsReady[socket] = true
-        logger.debug { "Socked was released $socket" }
-    }
-
-    override fun getSocket(uri: URI): Socket = createOrGetSocket(uri).let { socket ->
-        val currentTime = System.currentTimeMillis()
-
-        socketExpirationTimes[socket]?.let { expirationTime ->
-            if (currentTime > expirationTime) {
-                logger.debug { "Removing inactive socket: $socket (expired at: ${Instant.ofEpochMilli(expirationTime)})" }
-                removeSocket(socket)
-                return getSocket(uri)
-            }
-        }
-
-        socketExpirationTimes[socket] = currentTime + keepAliveTimeout
-        socket.apply { soTimeout = readTimeout }
-    }
-
-    override fun removeSocket(socket: Socket) {
-        socket.runCatching { close() }
-        socketsReady.remove(socket)
-        socketExpirationTimes -= socket
-    }
+    override fun removeSocket(socket: Socket) = socketPool.closeSocket(socket)
 
     override fun shouldContinue(waitForHttpResponse: Callable<RawHttpResponse<Void>>): Boolean {
         return executorService.submit(waitForHttpResponse).runCatching {
@@ -131,5 +86,60 @@ internal class ClientOptions(
         }.onFailure { logger.error(it) {} }.getOrElse { false }
     }
 
-    fun removeSockets() = socketsReady.keys.forEach(this::removeSocket)
+    override fun close() {
+        socketPool.close()
+    }
+
+    private class SocketPool(
+        private val host: String,
+        private val port: Int,
+        private val keepAliveTimeout: Long,
+        capacity: Int,
+        private val factory: (host: String, port: Int) -> Socket,
+    ) : Closeable {
+        private val logger = KotlinLogging.logger { SocketPool::class.simpleName }
+        private val semaphore = Semaphore(capacity)
+        private val sockets = ConcurrentLinkedQueue<Socket>()
+        private val expirationTimes = ConcurrentHashMap<Socket, Long>()
+
+        fun acquire(): Socket {
+            semaphore.acquire()
+
+            var socket = sockets.poll() ?: factory(host, port)
+            val currentTime = System.currentTimeMillis()
+            val expirationTime = expirationTimes.getOrPut(socket) { currentTime + keepAliveTimeout }
+
+            if(expirationTime < currentTime) {
+                expirationTimes -= socket
+                socket = factory(host, port)
+            }
+
+            return socket.apply {
+                expirationTimes[socket] = currentTime + keepAliveTimeout
+            }
+        }
+
+        fun release(socket: Socket) {
+            sockets.offer(socket)
+            semaphore.release()
+        }
+
+        fun closeSocket(socket: Socket) {
+            sockets.remove(socket)
+            expirationTimes.remove(socket)
+            tryClose(socket)
+        }
+
+        override fun close() {
+            sockets.forEach(this::tryClose)
+            sockets.clear()
+            expirationTimes.clear()
+
+        }
+
+        fun tryClose(socket: Socket) = socket.runCatching(Socket::close).onFailure { error ->
+            logger.warn(error) { "Cannot close socket: $this" }
+        }
+
+    }
 }

@@ -47,7 +47,7 @@ class ClientTest {
         private const val serverPort = 8086
         private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
         private var responseCount = AtomicInteger(0)
-        private lateinit var doneSignal: CountDownLatch
+        private lateinit var requestFlag: CountDownLatch
 
 
         private val server = TcpRawHttpServer(serverPort)
@@ -66,7 +66,7 @@ class ClientTest {
             server.start {
                 LOGGER.info { "Received request: ${it.startLine}" }
                 responseCount.incrementAndGet()
-                doneSignal.countDown()
+                requestFlag.countDown()
                 Optional.of(RawHttp().parseResponse(responseData))
             }
         }
@@ -82,7 +82,7 @@ class ClientTest {
     fun `Simple response test`() {
         val parentEventID = "testParentId"
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
-        doneSignal = CountDownLatch(1)
+        requestFlag = CountDownLatch(1)
 
         var newParentID = ""
         var newMetadata = mapOf<String, String>()
@@ -123,14 +123,14 @@ class ClientTest {
             Assertions.assertEquals(it.value, newMetadata[it.key])
         }
         Assertions.assertEquals(parentEventID, newParentID)
-        Assertions.assertEquals(0, doneSignal.count)
+        Assertions.assertEquals(0, requestFlag.count)
     }
 
     @Test
     fun `multiple response test`() {
         val executor = Executors.newCachedThreadPool()
 
-        doneSignal = CountDownLatch(5)
+        requestFlag = CountDownLatch(5)
 
         val parentEventID = "testParentId"
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
@@ -154,15 +154,15 @@ class ClientTest {
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
-        repeat(doneSignal.count.toInt()) {
+        repeat(requestFlag.count.toInt()) {
             executor.submit {
                 client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
             }
         }
 
         executor.invokeAll(mutableListOf<Callable<Any>>())
-        doneSignal.await(5, TimeUnit.SECONDS)
+        requestFlag.await(5, TimeUnit.SECONDS)
 
-        Assertions.assertEquals(0, doneSignal.count)
+        Assertions.assertEquals(0, requestFlag.count)
     }
 }
