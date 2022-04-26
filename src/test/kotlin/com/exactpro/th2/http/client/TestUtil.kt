@@ -36,6 +36,7 @@ fun get(
         readTimeout = 5000,
         keepAliveTimeout = 15000,
         socketCapacity = 5,
+        threadCount = 5,
         defaultHeaders = mapOf(),
         prepareRequest = { it },
         onRequest = {},

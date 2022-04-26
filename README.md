@@ -144,7 +144,7 @@ spec:
 
 #### Future:
 
-* Socket pool was implemented, all sockets will be created for same host/port and will be stored in pool for future usage
+* Ability to send multiple requests in parallel
 
 ### v0.5.3
 

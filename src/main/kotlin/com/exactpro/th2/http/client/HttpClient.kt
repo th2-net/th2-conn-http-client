@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2021 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@ import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -33,6 +36,7 @@ class HttpClient(
     readTimeout: Int,
     keepAliveTimeout: Long,
     socketCapacity: Int,
+    threadCount: Int,
     private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
@@ -54,6 +58,7 @@ class HttpClient(
 ) {
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
+    private val sendService: ExecutorService = createExecutorService(threadCount)
 
     @Volatile var isRunning: Boolean = false
         private set
@@ -83,6 +88,13 @@ class HttpClient(
                 isRunning = false
                 logger.info { "Stopped client" }
             }
+        }
+    }
+
+    fun sendAsync(request: RawHttpRequest) {
+        //TODO: Implement as interface method
+        sendService.submit {
+            this.send(request)
         }
     }
 
@@ -116,7 +128,9 @@ class HttpClient(
         val response = runCatching {
             super.send(preparedRequest)
         }.getOrElse { cause ->
-            logger.error { "Cannot send request due error: ${cause.message}" }
+            val socket = options.getSocket(preparedRequest.uri)
+            logger.error(cause) { "Removing socket due to network error: $socket" }
+            options.removeSocket(socket)
             throw cause
         }
 
@@ -132,6 +146,16 @@ class HttpClient(
     override fun close() {
         if (isRunning) stop()
         super.close()
+    }
+
+    private fun createExecutorService(maxCount: Int) : ExecutorService {
+        val threadCount = AtomicInteger(1)
+        return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
+            Thread(runnable).apply {
+                isDaemon = true
+                name = "th2-http-server-${threadCount.incrementAndGet()}"
+            }
+        }
     }
 }
 

@@ -21,14 +21,11 @@ import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
-import java.io.Closeable
 import java.net.Socket
 import java.net.URI
-import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
 import kotlin.concurrent.withLock
@@ -37,7 +34,7 @@ internal class ClientOptions(
     private val readTimeout: Int,
     keepAliveTimeout: Long,
     private val socketFactory: SocketFactory,
-    socketCapacity: Int,
+    socketPoolSize: Int,
     host: String,
     port: Int,
     private val onRequest: (RawHttpRequest) -> Unit,
@@ -45,8 +42,13 @@ internal class ClientOptions(
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
 
-    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, socketCapacity) { host, port ->
-        createSocket(true, host, port)
+    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, socketPoolSize) { host, port ->
+        lock.withLock {
+            socketFactory.createSocket(host, port).also {
+                it.soTimeout = readTimeout
+                logger.debug { "Created socket $it" }
+            }
+        }
     }
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
@@ -56,35 +58,19 @@ internal class ClientOptions(
     }
 
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> =  try {
-        httpResponse.eagerly()
+        httpResponse.eagerly().also { logger.info { "Received response on socket '$socket': $it" } }
     } catch (e: Throwable) {
         throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
-    }.also {
-        logger.info { "Received response on socket '$socket': $it" }
-        if (RawHttpResponse.shouldCloseConnectionAfter(it)) {
-            removeSocket(socket)
-        } else {
-            socketPool.release(socket)
-        }
-    }
-
-    override fun createSocket(useHttps: Boolean, host: String, port: Int): Socket = lock.withLock {
-        socketFactory.createSocket(host, port).also {
-            it.soTimeout = readTimeout
-            logger.debug { "Created socket $it" }
+    } finally {
+        when {
+            RawHttpResponse.shouldCloseConnectionAfter(httpResponse) -> removeSocket(socket)
+            else -> socketPool.release(socket)
         }
     }
 
     override fun getSocket(uri: URI): Socket = socketPool.acquire()
 
-    override fun removeSocket(socket: Socket) = socketPool.closeSocket(socket)
-
-    override fun shouldContinue(waitForHttpResponse: Callable<RawHttpResponse<Void>>): Boolean {
-        return executorService.submit(waitForHttpResponse).runCatching {
-            val response = this[5, TimeUnit.SECONDS]
-            response.statusCode == 100 || response.statusCode in 200..399
-        }.onFailure { logger.error(it) {} }.getOrElse { false }
-    }
+    override fun removeSocket(socket: Socket) = socketPool.close(socket)
 
     override fun close() {
         socketPool.close()
@@ -96,7 +82,7 @@ internal class ClientOptions(
         private val keepAliveTimeout: Long,
         capacity: Int,
         private val factory: (host: String, port: Int) -> Socket,
-    ) : Closeable {
+    ) : AutoCloseable {
         private val logger = KotlinLogging.logger { SocketPool::class.simpleName }
         private val semaphore = Semaphore(capacity)
         private val sockets = ConcurrentLinkedQueue<Socket>()
@@ -124,10 +110,10 @@ internal class ClientOptions(
             semaphore.release()
         }
 
-        fun closeSocket(socket: Socket) {
-            sockets.remove(socket)
+        fun close(socket: Socket) {
             expirationTimes.remove(socket)
             tryClose(socket)
+            semaphore.release()
         }
 
         override fun close() {
@@ -140,6 +126,5 @@ internal class ClientOptions(
         fun tryClose(socket: Socket) = socket.runCatching(Socket::close).onFailure { error ->
             logger.warn(error) { "Cannot close socket: $this" }
         }
-
     }
 }

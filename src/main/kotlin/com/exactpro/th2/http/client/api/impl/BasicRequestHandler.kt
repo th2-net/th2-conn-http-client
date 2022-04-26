@@ -17,23 +17,21 @@
 package com.exactpro.th2.http.client.api.impl
 
 import com.exactpro.th2.common.grpc.MessageGroup
+import com.exactpro.th2.http.client.HttpClient
 import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.util.toRequest
-import mu.KotlinLogging
-import rawhttp.core.client.RawHttpClient
 
 class BasicRequestHandler : IRequestHandler {
-    private val logger = KotlinLogging.logger {}
-    private lateinit var client: RawHttpClient<*>
+    private lateinit var client: HttpClient
 
     override fun init(context: RequestHandlerContext) {
         check(!::client.isInitialized) { "Request handler is already initialized" }
-        this.client = context.httpClient
+        this.client = context.httpClient as HttpClient
     }
 
     override fun onRequest(request: MessageGroup) {
-        client.send(request.toRequest())
+        client.sendAsync(request.toRequest())
     }
 
     override fun close() {}

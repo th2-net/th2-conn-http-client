@@ -33,9 +33,7 @@ import rawhttp.core.body.BytesBody
 import rawhttp.core.server.TcpRawHttpServer
 import java.net.URI
 import java.util.Optional
-import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -103,7 +101,7 @@ class ClientTest {
             LOGGER.debug("Response handled: ${response.statusCode}")
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000, socketCapacity = 5, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(false, "localhost", serverPort, 20000, 5000, socketCapacity = 5, threadCount = 5, emptyMap(), prepareRequest, onRequest, onResponse)
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
@@ -128,7 +126,6 @@ class ClientTest {
 
     @Test
     fun `multiple response test`() {
-        val executor = Executors.newCachedThreadPool()
 
         requestFlag = CountDownLatch(5)
 
@@ -149,18 +146,15 @@ class ClientTest {
             LOGGER.info("Response handled: ${response.statusCode}")
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000, socketCapacity = 5, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(false, "localhost", serverPort, 20000, 5000, socketCapacity = 5, threadCount = 5, emptyMap(), prepareRequest, onRequest, onResponse)
         client.start()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
         repeat(requestFlag.count.toInt()) {
-            executor.submit {
-                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
-            }
+            client.sendAsync(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
         }
 
-        executor.invokeAll(mutableListOf<Callable<Any>>())
         requestFlag.await(5, TimeUnit.SECONDS)
 
         Assertions.assertEquals(0, requestFlag.count)
