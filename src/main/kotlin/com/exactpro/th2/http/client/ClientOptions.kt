@@ -115,7 +115,13 @@ internal class ClientOptions(
         fun acquire(): Socket {
             semaphore.acquire()
 
-            var socket = sockets.poll() ?: factory(host, port)
+            var socket = sockets.poll().let { socket ->
+                when {
+                    socket == null || socket.isClosed || !socket.isConnected -> factory(host, port)
+                    else -> socket
+                }
+            }
+
             val currentTime = System.currentTimeMillis()
             val expirationTime = expirationTimes.getOrPut(socket) { currentTime + keepAliveTimeout }
 
