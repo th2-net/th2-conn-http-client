@@ -112,18 +112,18 @@ internal class ClientOptions(
 
         fun close(socket: Socket) {
             expirationTimes.remove(socket)
-            tryClose(socket)
+            socket.tryClose()
             semaphore.release()
         }
 
         override fun close() {
-            sockets.forEach(this::tryClose)
+            sockets.forEach { it.tryClose() }
             sockets.clear()
             expirationTimes.clear()
 
         }
 
-        fun tryClose(socket: Socket) = socket.runCatching(Socket::close).onFailure { error ->
+        fun Socket.tryClose() = runCatching(Socket::close).onFailure { error ->
             logger.warn(error) { "Cannot close socket: $this" }
         }
     }
