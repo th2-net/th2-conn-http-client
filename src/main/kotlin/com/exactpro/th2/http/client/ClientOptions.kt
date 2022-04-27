@@ -64,7 +64,9 @@ internal class ClientOptions(
     } finally {
         when {
             RawHttpResponse.shouldCloseConnectionAfter(httpResponse) -> removeSocket(socket)
-            else -> socketPool.release(socket)
+            else -> if (httpResponse.statusCode != 100) {
+                socketPool.release(socket)
+            }
         }
     }
 
@@ -111,7 +113,7 @@ internal class ClientOptions(
         }
 
         fun close(socket: Socket) {
-            expirationTimes.remove(socket)
+            expirationTimes -= socket
             socket.tryClose()
             semaphore.release()
         }

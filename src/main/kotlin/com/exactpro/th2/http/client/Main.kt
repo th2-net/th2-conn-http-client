@@ -58,7 +58,10 @@ import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentLinkedDeque
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.SECONDS
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
@@ -149,7 +152,6 @@ fun run(
         settings.readTimeout,
         settings.keepAliveTimeout,
         settings.maxParallelRequests,
-        settings.maxThreadCount,
         settings.defaultHeaders,
         stateManager::prepareRequest,
         onRequest,
@@ -178,11 +180,15 @@ fun run(
         throw it
     }
 
+    val sendService: ExecutorService = createExecutorService(settings.maxParallelRequests)
+
     val listener = MessageListener<MessageGroupBatch> { _, message ->
         message.groupsList.forEach { group ->
-            group.runCatching(requestHandler::onRequest).recoverCatching {
-                LOGGER.error(it) { "Failed to handle message group: ${group.toPrettyString()}" }
-                eventRouter.storeEvent(rootEventId, "Failed to handle message group: ${group.toPrettyString()}", "Error", it)
+            sendService.submit {
+                group.runCatching(requestHandler::onRequest).recoverCatching {
+                    LOGGER.error(it) { "Failed to handle message group: ${group.toPrettyString()}" }
+                    eventRouter.storeEvent(rootEventId, "Failed to handle message group: ${group.toPrettyString()}", "Error", it)
+                }
             }
         }
     }
@@ -216,7 +222,6 @@ data class Settings(
     val port: Int = if (https) 443 else 80,
     val readTimeout: Int = 5000,
     val maxParallelRequests: Int = 5,
-    val maxThreadCount: Int = 5,
     val keepAliveTimeout: Long = 15000,
     val defaultHeaders: Map<String, List<String>> = emptyMap(),
     val sessionAlias: String,
@@ -264,4 +269,14 @@ private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, 
     storeEvent(event, eventId)
 
     return event.id
+}
+
+private fun createExecutorService(maxCount: Int) : ExecutorService {
+    val threadCount = AtomicInteger(1)
+    return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
+        Thread(runnable).apply {
+            isDaemon = true
+            name = "th2-http-server-${threadCount.incrementAndGet()}"
+        }
+    }
 }

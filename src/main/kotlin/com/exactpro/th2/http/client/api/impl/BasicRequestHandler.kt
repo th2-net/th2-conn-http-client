@@ -31,7 +31,7 @@ class BasicRequestHandler : IRequestHandler {
     }
 
     override fun onRequest(request: MessageGroup) {
-        client.sendAsync(request.toRequest())
+        client.send(request.toRequest())
     }
 
     override fun close() {}

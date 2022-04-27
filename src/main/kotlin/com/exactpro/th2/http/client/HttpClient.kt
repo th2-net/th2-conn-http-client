@@ -19,13 +19,16 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
 import mu.KotlinLogging
+import rawhttp.core.HttpVersion
+import rawhttp.core.IOSupplier
+import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import java.net.Socket
+import java.util.concurrent.Callable
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -35,8 +38,7 @@ class HttpClient(
     private val port: Int,
     readTimeout: Int,
     keepAliveTimeout: Long,
-    socketCapacity: Int,
-    threadCount: Int,
+    maxParallelRequests: Int,
     private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
@@ -50,7 +52,7 @@ class HttpClient(
         readTimeout,
         keepAliveTimeout,
         getSocketFactory(https, validateCertificates, clientCertificate),
-        socketCapacity,
+        maxParallelRequests,
         host,
         port,
         onRequest
@@ -58,7 +60,8 @@ class HttpClient(
 ) {
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
-    private val sendService: ExecutorService = createExecutorService(threadCount)
+    private val rawHttp = RawHttp()
+
 
     @Volatile var isRunning: Boolean = false
         private set
@@ -91,13 +94,6 @@ class HttpClient(
         }
     }
 
-    fun sendAsync(request: RawHttpRequest) {
-        //TODO: Implement as interface method
-        sendService.submit {
-            this.send(request)
-        }
-    }
-
     override fun send(request: RawHttpRequest): RawHttpResponse<Void> {
         if (!isRunning) start()
 
@@ -125,14 +121,7 @@ class HttpClient(
             }
         }
 
-        val response = runCatching {
-            super.send(preparedRequest)
-        }.getOrElse { cause ->
-            val socket = options.getSocket(preparedRequest.uri)
-            logger.error(cause) { "Removing socket due to network error: $socket" }
-            options.removeSocket(socket)
-            throw cause
-        }
+        val response = sendRequest(preparedRequest)
 
         response.runCatching {
             onResponse(preparedRequest, response)
@@ -143,17 +132,66 @@ class HttpClient(
         return response
     }
 
+    private fun sendRequest(request: RawHttpRequest): RawHttpResponse<Void> {
+        val socket: Socket = try {
+            options.getSocket(request.uri)
+        } catch (e: RuntimeException) {
+            logger.error(e) { "Cannot open socket due to network error" }
+            throw e
+        }
+
+        try {
+            val finalRequest = options.onRequest(request)
+            val expectContinue = !finalRequest.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1) && finalRequest.expectContinue()
+
+            val outputStream = socket.getOutputStream()
+            val inputStream = socket.getInputStream()
+            options.executorService.submit(requestSender(finalRequest, outputStream, expectContinue))
+
+            val response = if (expectContinue) {
+                val responseWaiter = ResponseWaiter { rawHttp.parseResponse(inputStream, finalRequest.startLine) }
+                if (options.shouldContinue(responseWaiter)) {
+                    finalRequest.body.get().writeTo(outputStream)
+                    responseWaiter.call()
+                } else {
+                    throw RuntimeException("Unable to obtain a response due to a 100-continue " + "request not being continued")
+                }
+            } else {
+                rawHttp.parseResponse(inputStream, finalRequest.startLine)
+            }
+
+            return when (response.statusCode) {
+                100 -> {
+                    options.onResponse(socket, finalRequest.uri, response)
+                    options.onResponse(socket, finalRequest.uri, rawHttp.parseResponse(socket.getInputStream(), finalRequest.startLine))
+                }
+                else -> options.onResponse(socket, finalRequest.uri, response)
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Removing socket due to network error: $socket" }
+            options.removeSocket(socket)
+            throw e
+        }
+    }
+
     override fun close() {
         if (isRunning) stop()
         super.close()
     }
 
-    private fun createExecutorService(maxCount: Int) : ExecutorService {
-        val threadCount = AtomicInteger(1)
-        return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
-            Thread(runnable).apply {
-                isDaemon = true
-                name = "th2-http-server-${threadCount.incrementAndGet()}"
+    private class ResponseWaiter(private val readResponse: IOSupplier<RawHttpResponse<Void>>) : Callable<RawHttpResponse<Void>?> {
+        val wasCalled = AtomicBoolean(false)
+
+        @Volatile
+        lateinit var response: RawHttpResponse<Void>
+
+        override fun call(): RawHttpResponse<Void> {
+            return if (wasCalled.compareAndSet(false, true)) {
+                readResponse.get().also {
+                    response = it
+                }
+            } else {
+                response
             }
         }
     }
