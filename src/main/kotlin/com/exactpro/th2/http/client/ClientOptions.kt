@@ -34,7 +34,7 @@ internal class ClientOptions(
     private val readTimeout: Int,
     keepAliveTimeout: Long,
     private val socketFactory: SocketFactory,
-    socketPoolSize: Int,
+    maxParallelRequests: Int,
     host: String,
     port: Int,
     private val onRequest: (RawHttpRequest) -> Unit,
@@ -42,7 +42,7 @@ internal class ClientOptions(
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
 
-    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, socketPoolSize) { host, port ->
+    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, maxParallelRequests) { host, port ->
         lock.withLock {
             socketFactory.createSocket(host, port).also {
                 it.soTimeout = readTimeout
