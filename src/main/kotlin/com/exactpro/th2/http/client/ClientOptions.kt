@@ -25,7 +25,11 @@ import java.net.Socket
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
 import kotlin.concurrent.withLock
@@ -42,7 +46,7 @@ internal class ClientOptions(
     private val logger = KotlinLogging.logger {}
     private val lock = ReentrantLock()
 
-    private val socketPool: SocketPool = SocketPool(host,port, keepAliveTimeout, maxParallelRequests) { host, port ->
+    private val socketPool: SocketPool = SocketPool(host, port, keepAliveTimeout, maxParallelRequests) { host, port ->
         lock.withLock {
             socketFactory.createSocket(host, port).also {
                 it.soTimeout = readTimeout
@@ -51,13 +55,27 @@ internal class ClientOptions(
         }
     }
 
+    private val executorService = run {
+        val counter = AtomicInteger(1)
+        Executors.newFixedThreadPool(maxParallelRequests) { runnable: Runnable? ->
+            Thread(runnable).apply {
+                isDaemon = true
+                name = "tcp-th2-client-" + counter.incrementAndGet()
+            }
+        }
+    }
+
+    override fun getExecutorService(): ExecutorService {
+        return this.executorService
+    }
+
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
         logger.info { "Sending request: $httpRequest" }
         httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
         return httpRequest
     }
 
-    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> =  try {
+    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> = try {
         httpResponse.eagerly().also { logger.info { "Received response on socket '$socket': $it" } }
     } catch (e: Throwable) {
         throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
@@ -75,6 +93,10 @@ internal class ClientOptions(
     override fun removeSocket(socket: Socket) = socketPool.close(socket)
 
     override fun close() {
+        executorService.shutdown()
+        if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+            executorService.shutdownNow()
+        }
         socketPool.close()
     }
 
@@ -97,7 +119,7 @@ internal class ClientOptions(
             val currentTime = System.currentTimeMillis()
             val expirationTime = expirationTimes.getOrPut(socket) { currentTime + keepAliveTimeout }
 
-            if(expirationTime < currentTime) {
+            if (expirationTime < currentTime) {
                 expirationTimes -= socket
                 socket = factory(host, port)
             }
