@@ -46,8 +46,6 @@ class ClientTest {
         private const val serverPort = 8086
         private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
         private var responseCount = AtomicInteger(0)
-        private lateinit var requestFlag: CountDownLatch
-
 
         private val server = TcpRawHttpServer(serverPort)
 
@@ -63,9 +61,8 @@ class ClientTest {
         @JvmStatic
         fun setUp() {
             server.start {
-                LOGGER.info { "Received request: ${it.startLine}" }
+                LOGGER.info { "Received request: ${it.eagerly().startLine}" }
                 responseCount.incrementAndGet()
-                requestFlag.countDown()
                 Optional.of(RawHttp().parseResponse(responseData))
             }
         }
@@ -81,7 +78,7 @@ class ClientTest {
     fun `Simple response test`() {
         val parentEventID = "testParentId"
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
-        requestFlag = CountDownLatch(1)
+        val requestFlag = CountDownLatch(1)
 
         var newParentID = ""
         var newMetadata = mapOf<String, String>()
@@ -99,6 +96,7 @@ class ClientTest {
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
+            requestFlag.countDown()
             LOGGER.debug("Response handled: ${response.statusCode}")
         }
 
@@ -129,7 +127,7 @@ class ClientTest {
     fun `multiple response test`() {
         val executor = Executors.newCachedThreadPool()
 
-        requestFlag = CountDownLatch(5)
+        val requestFlag = CountDownLatch(6)
 
         val parentEventID = "testParentId"
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
@@ -138,6 +136,7 @@ class ClientTest {
         val requestBody = body.toByteArray()
         val httpHeaders = RawHttpHeaders.newBuilder().apply {
             with(CONTENT_LENGTH_HEADER, requestBody.size.toString())
+            with("Connection", "Keep-Alive")
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
@@ -145,10 +144,11 @@ class ClientTest {
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
+            requestFlag.countDown()
             LOGGER.info("Response handled: ${response.statusCode}")
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  5, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  2, emptyMap(), prepareRequest, onRequest, onResponse)
         client.start()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
@@ -160,6 +160,7 @@ class ClientTest {
         }
 
         requestFlag.await(5, TimeUnit.SECONDS)
+        client.stop()
 
         Assertions.assertEquals(0, requestFlag.count)
     }

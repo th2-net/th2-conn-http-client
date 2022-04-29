@@ -82,14 +82,13 @@ class HttpClient(
     }
 
     fun stop() = lock.withLock {
-        when (!isRunning) {
-            true -> logger.info { "Client is already stopped" }
+        when {
+            !isRunning -> logger.info { "Client is already stopped" }
             else -> {
                 logger.info { "Stopping client" }
                 runCatching(onStop).onFailure { logger.error(it) { "Failed to execute onStop hook" } }
                 options.close()
                 isRunning = false
-                logger.info { "Stopped client" }
             }
         }
     }
@@ -157,6 +156,8 @@ class HttpClient(
                     throw RuntimeException("Unable to obtain a response due to a 100-continue " + "request not being continued")
                 }
             } else {
+                logger.info {"parseResponse"}
+
                 rawHttp.parseResponse(inputStream, finalRequest.startLine)
             }
 

@@ -276,7 +276,7 @@ private fun createExecutorService(maxCount: Int) : ExecutorService {
     return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
         Thread(runnable).apply {
             isDaemon = true
-            name = "th2-http-server-${threadCount.incrementAndGet()}"
+            name = "th2-http-client-${threadCount.incrementAndGet()}"
         }
     }
 }

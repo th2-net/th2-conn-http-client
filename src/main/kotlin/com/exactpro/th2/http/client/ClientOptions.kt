@@ -44,10 +44,11 @@ internal class ClientOptions(
     private val onRequest: (RawHttpRequest) -> Unit,
 ) : TcpRawHttpClient.DefaultOptions() {
     private val logger = KotlinLogging.logger {}
-    private val lock = ReentrantLock()
+    private val factoryLock = ReentrantLock()
+
 
     private val socketPool: SocketPool = SocketPool(host, port, keepAliveTimeout, maxParallelRequests) { host, port ->
-        lock.withLock {
+        factoryLock.withLock {
             socketFactory.createSocket(host, port).also {
                 it.soTimeout = readTimeout
                 logger.debug { "Created socket $it" }
@@ -82,9 +83,7 @@ internal class ClientOptions(
     } finally {
         when {
             RawHttpResponse.shouldCloseConnectionAfter(httpResponse) -> removeSocket(socket)
-            else -> if (httpResponse.statusCode != 100) {
-                socketPool.release(socket)
-            }
+            httpResponse.statusCode != 100 -> socketPool.release(socket)
         }
     }
 
@@ -112,15 +111,20 @@ internal class ClientOptions(
         private val sockets = ConcurrentLinkedQueue<Socket>()
         private val expirationTimes = ConcurrentHashMap<Socket, Long>()
 
+
         fun acquire(): Socket {
             semaphore.acquire()
 
             var socket = sockets.poll().let { socket ->
                 when {
-                    socket == null || socket.isClosed || !socket.isConnected -> factory(host, port)
+                    socket == null || socket.isClosed || !socket.isConnected -> {
+                        factory(host, port)
+                    }
                     else -> socket
                 }
             }
+
+            logger.info { "Acquire: semaphore: $semaphore \n socket: $socket" }
 
             val currentTime = System.currentTimeMillis()
             val expirationTime = expirationTimes.getOrPut(socket) { currentTime + keepAliveTimeout }
@@ -130,6 +134,7 @@ internal class ClientOptions(
                 socket = factory(host, port)
             }
 
+
             return socket.apply {
                 expirationTimes[socket] = currentTime + keepAliveTimeout
             }
@@ -138,15 +143,18 @@ internal class ClientOptions(
         fun release(socket: Socket) {
             sockets.offer(socket)
             semaphore.release()
+            logger.info { "Release: semaphore: $semaphore \n socket: $socket" }
         }
 
         fun close(socket: Socket) {
             expirationTimes -= socket
             socket.tryClose()
             semaphore.release()
+            logger.info { "Close: semaphore: $semaphore \n socket: $socket" }
         }
 
         override fun close() {
+            semaphore.release()
             sockets.forEach { it.tryClose() }
             sockets.clear()
             expirationTimes.clear()
