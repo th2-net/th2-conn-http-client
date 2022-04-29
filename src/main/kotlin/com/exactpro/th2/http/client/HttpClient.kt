@@ -156,8 +156,6 @@ class HttpClient(
                     throw RuntimeException("Unable to obtain a response due to a 100-continue " + "request not being continued")
                 }
             } else {
-                logger.info {"parseResponse"}
-
                 rawHttp.parseResponse(inputStream, finalRequest.startLine)
             }
 

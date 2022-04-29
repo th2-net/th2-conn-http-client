@@ -124,8 +124,6 @@ internal class ClientOptions(
                 }
             }
 
-            logger.info { "Acquire: semaphore: $semaphore \n socket: $socket" }
-
             val currentTime = System.currentTimeMillis()
             val expirationTime = expirationTimes.getOrPut(socket) { currentTime + keepAliveTimeout }
 
@@ -143,14 +141,12 @@ internal class ClientOptions(
         fun release(socket: Socket) {
             sockets.offer(socket)
             semaphore.release()
-            logger.info { "Release: semaphore: $semaphore \n socket: $socket" }
         }
 
         fun close(socket: Socket) {
             expirationTimes -= socket
             socket.tryClose()
             semaphore.release()
-            logger.info { "Close: semaphore: $semaphore \n socket: $socket" }
         }
 
         override fun close() {
