@@ -117,9 +117,7 @@ internal class ClientOptions(
 
             var socket = sockets.poll().let { socket ->
                 when {
-                    socket == null || socket.isClosed || !socket.isConnected -> {
-                        factory(host, port)
-                    }
+                    socket == null || socket.isClosed || !socket.isConnected -> factory(host, port)
                     else -> socket
                 }
             }
@@ -150,7 +148,6 @@ internal class ClientOptions(
         }
 
         override fun close() {
-            semaphore.release()
             sockets.forEach { it.tryClose() }
             sockets.clear()
             expirationTimes.clear()
