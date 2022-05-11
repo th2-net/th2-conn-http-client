@@ -35,6 +35,7 @@ fun get(
         port = 443,
         readTimeout = 5000,
         keepAliveTimeout = 15000,
+        maxParallelRequests = 5,
         defaultHeaders = mapOf(),
         prepareRequest = { it },
         onRequest = {},
