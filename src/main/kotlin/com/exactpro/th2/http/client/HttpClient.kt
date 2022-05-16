@@ -26,6 +26,7 @@ import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.client.TcpRawHttpClient
+import rawhttp.core.errors.InvalidHttpResponse
 import java.net.Socket
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicBoolean
@@ -167,7 +168,14 @@ class HttpClient(
                 else -> options.onResponse(socket, finalRequest.uri, response)
             }
         } catch (e: Exception) {
-            logger.error(e) { "Removing socket due to network error: $socket" }
+            when {
+                e is InvalidHttpResponse && e.lineNumber == 0 && e.message == "No content" -> {
+                    logger.error { "Server closed connection while awaiting response" }
+                }
+                else -> {
+                    logger.error(e) { "Removing socket due to network error: $socket" }
+                }
+            }
             options.removeSocket(socket)
             throw e
         }
