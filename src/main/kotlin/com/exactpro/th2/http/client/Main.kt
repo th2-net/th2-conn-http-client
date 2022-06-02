@@ -155,7 +155,11 @@ fun run(
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
         messageBatcher.onMessage(response.toRawMessage(connectionId, incomingSequence(), request).build(), Direction.FIRST)
-        stateManager.onResponse(response)
+        try {
+            stateManager.onResponse(response)
+        } catch (e: Exception) {
+            LOGGER.error(e) {"Failed to execute onResponse method from state manager"}
+        }
     }
 
     val client = HttpClient(

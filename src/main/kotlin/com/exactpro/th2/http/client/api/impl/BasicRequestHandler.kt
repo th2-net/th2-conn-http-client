@@ -21,6 +21,8 @@ import com.exactpro.th2.http.client.HttpClient
 import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.util.toRequest
+import com.exactpro.th2.http.client.util.tryClose
+import rawhttp.core.body.BodyReader
 
 class BasicRequestHandler : IRequestHandler {
     private lateinit var client: HttpClient
@@ -31,7 +33,11 @@ class BasicRequestHandler : IRequestHandler {
     }
 
     override fun onRequest(request: MessageGroup) {
-        client.send(request.toRequest())
+        val httpRequest = request.toRequest()
+        val httpResponse = client.send(httpRequest)
+
+        httpRequest.body.ifPresent(BodyReader::tryClose)
+        httpResponse.body.ifPresent(BodyReader::tryClose)
     }
 
     override fun close() {}

@@ -44,10 +44,12 @@ class ClientTest {
         private val LOGGER = KotlinLogging.logger { }
 
         private const val serverPort = 8086
-        private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
-        private var responseCount = AtomicInteger(0)
 
         private val server = TcpRawHttpServer(serverPort)
+        private val rawHttp = RawHttp()
+
+        private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
+        private var responseCount = AtomicInteger(0)
 
         private val responseData = """
           HTTP/1.1 200 OK
@@ -61,9 +63,9 @@ class ClientTest {
         @JvmStatic
         fun setUp() {
             server.start {
-                LOGGER.info { "Received request: ${it.eagerly().startLine}" }
+                it.eagerly()
                 responseCount.incrementAndGet()
-                Optional.of(RawHttp().parseResponse(responseData))
+                Optional.of(rawHttp.parseResponse(responseData))
             }
         }
 
@@ -140,12 +142,11 @@ class ClientTest {
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
-            LOGGER.info("Request submitted: ${request.startLine}")
+            LOGGER.debug("Request submitted: ${request.startLine}")
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
-            requestFlag.countDown()
-            LOGGER.info("Response handled: ${response.statusCode}")
+            LOGGER.debug("Response handled: ${response.statusCode}")
         }
 
         val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  2, emptyMap(), prepareRequest, onRequest, onResponse)
@@ -154,8 +155,10 @@ class ClientTest {
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
         repeat(requestFlag.count.toInt()) {
-            executor.submit {
-                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
+            executor.execute {
+                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata)).apply {
+                    requestFlag.countDown()
+                }
             }
         }
 

@@ -18,6 +18,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
+import com.exactpro.th2.http.client.util.tryClose
 import mu.KotlinLogging
 import rawhttp.core.HttpVersion
 import rawhttp.core.IOSupplier
@@ -25,6 +26,7 @@ import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
+import rawhttp.core.body.BodyReader
 import rawhttp.core.client.TcpRawHttpClient
 import rawhttp.core.errors.InvalidHttpResponse
 import java.net.Socket
@@ -121,12 +123,12 @@ class HttpClient(
             }
         }
 
-        val response = sendRequest(preparedRequest)
-
-        response.runCatching {
-            onResponse(preparedRequest, response)
-        }.onFailure {
-            logger.error(it) { "Failed to execute onResponse hook" }
+        val response = try {
+            sendRequest(preparedRequest).also {
+                onResponse(preparedRequest, it)
+            }
+        } finally {
+            preparedRequest.body.ifPresent(BodyReader::tryClose)
         }
 
         return response
