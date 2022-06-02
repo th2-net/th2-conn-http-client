@@ -146,7 +146,7 @@ class HttpClient(
 
             val outputStream = socket.getOutputStream()
             val inputStream = socket.getInputStream()
-            options.executorService.submit(requestSender(finalRequest, outputStream, expectContinue))
+            options.executorService.execute(requestSender(finalRequest, outputStream, expectContinue))
 
             val response = if (expectContinue) {
                 val responseWaiter = ResponseWaiter { rawHttp.parseResponse(inputStream, finalRequest.startLine) }

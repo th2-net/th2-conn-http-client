@@ -26,8 +26,10 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.Semaphore
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
@@ -56,19 +58,29 @@ internal class ClientOptions(
         }
     }
 
-    private val executorService = run {
+    private val executorService: ExecutorService = run {
         val counter = AtomicInteger(1)
-        Executors.newFixedThreadPool(maxParallelRequests) { runnable: Runnable? ->
+        ThreadPoolExecutor(maxParallelRequests, maxParallelRequests, 0L, TimeUnit.MILLISECONDS, SynchronousQueue()) { runnable: Runnable? ->
             Thread(runnable).apply {
                 isDaemon = true
                 name = "tcp-th2-client-" + counter.incrementAndGet()
             }
+        }.apply {
+            setRejectedExecutionHandler { runnable, threadPoolExecutor ->
+                try {
+                    // Wait until queue is ready, don`t throw reject
+                    threadPoolExecutor.queue.put(runnable)
+                    if (threadPoolExecutor.isShutdown) {
+                        throw RejectedExecutionException("Task $runnable rejected from $threadPoolExecutor due shutdown")
+                    }
+                } catch (e: InterruptedException) {
+                    throw RejectedExecutionException("Task $runnable rejected from $threadPoolExecutor", e)
+                }
+            }
         }
     }
 
-    override fun getExecutorService(): ExecutorService {
-        return this.executorService
-    }
+    override fun getExecutorService() = this.executorService
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
         logger.info { "Sending request: $httpRequest" }

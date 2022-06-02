@@ -20,15 +20,17 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.MessageGroupBatch
-import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.QueueAttribute.FIRST
 import com.exactpro.th2.common.schema.message.QueueAttribute.SECOND
 import com.exactpro.th2.common.schema.message.storeEvent
+import com.exactpro.th2.common.utils.event.EventBatcher
+import com.exactpro.th2.common.utils.event.MessageBatcherDirection
 import com.exactpro.th2.http.client.api.IAuthSettings
 import com.exactpro.th2.http.client.api.IAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.IRequestHandler
@@ -42,7 +44,7 @@ import com.exactpro.th2.http.client.api.impl.BasicStateManager
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.CertificateConverter
 import com.exactpro.th2.http.client.util.PrivateKeyConverter
-import com.exactpro.th2.http.client.util.toBatch
+import com.exactpro.th2.http.client.util.storeEvent
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toRawMessage
 import com.fasterxml.jackson.annotation.JsonIgnore
@@ -129,19 +131,30 @@ fun run(
     val incomingSequence = createSequence()
     val outgoingSequence = createSequence()
 
-    val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
-        val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
+    val scheduledExecutorService = Executors.newScheduledThreadPool(1).also {
+        registerResource("Batcher scheduled executor", it::shutdownNow)
+    }
 
-        messageRouter.send(rawMessage.toBatch(), SECOND.toString())
-        eventRouter.storeEvent(
-            "Sent HTTP request",
-            if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId,
-            rawMessage.metadata.id
-        )
+    val messageBatcher = MessageBatcherDirection(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService, onBatch = { batch, direction ->
+        messageRouter.send(batch, when(direction) {
+            Direction.FIRST -> FIRST
+            Direction.SECOND -> SECOND
+            else -> error("Unsupported direction $direction")
+        }.toString())
+    })
+
+    val eventBatcher = EventBatcher(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService) { batch ->
+        eventRouter.send(batch)
+    }
+
+    val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
+        val rawMessage = request.toRawMessage(connectionId, outgoingSequence()).build()
+        messageBatcher.onMessage(rawMessage, Direction.SECOND)
+        eventBatcher.storeEvent("Sent HTTP request", rawMessage.metadata.id, if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId)
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), request).toBatch(), FIRST.toString())
+        messageBatcher.onMessage(response.toRawMessage(connectionId, incomingSequence(), request).build(), Direction.FIRST)
         stateManager.onResponse(response)
     }
 
@@ -167,7 +180,7 @@ fun run(
         init(StateManagerContext(client, settings.auth))
     }.onFailure {
         LOGGER.error(it) { "Failed to init state manager" }
-        eventRouter.storeEvent(rootEventId, "Failed to init state manager", "Error", it)
+        eventBatcher.storeEvent("Failed to init state manager", "Error", rootEventId, it)
         throw it
     }
 
@@ -176,7 +189,7 @@ fun run(
         init(RequestHandlerContext(client))
     }.onFailure {
         LOGGER.error(it) { "Failed to init request handler" }
-        eventRouter.storeEvent(rootEventId, "Failed to init request handler", "Error", it)
+        eventBatcher.storeEvent("Failed to init request handler", "Error", rootEventId, it)
         throw it
     }
 
@@ -187,7 +200,7 @@ fun run(
             sendService.submit {
                 group.runCatching(requestHandler::onRequest).recoverCatching {
                     LOGGER.error(it) { "Failed to handle message group: ${group.toPrettyString()}" }
-                    eventRouter.storeEvent(rootEventId, "Failed to handle message group: ${group.toPrettyString()}", "Error", it)
+                    eventBatcher.storeEvent("Failed to handle message group: ${group.toPrettyString()}", "Error", rootEventId, it)
                 }
             }
         }
@@ -229,6 +242,8 @@ data class Settings(
     val validateCertificates: Boolean = true,
     @JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
     @JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
+    val maxBatchSize: Int = 100,
+    val maxFlushTime: Long = 1000
 ) {
     @JsonIgnore val certificate: Certificate? = clientCertificate?.run {
         requireNotNull(certificatePrivateKey) {
@@ -253,23 +268,6 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
 private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
-
-private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, messageId: MessageID) : String {
-    val type = "Info"
-    val status = Event.Status.PASSED
-    val event = Event.start().apply {
-        endTimestamp()
-        name(name)
-        type(type)
-        status(status)
-
-        messageID(messageId)
-    }
-
-    storeEvent(event, eventId)
-
-    return event.id
-}
 
 private fun createExecutorService(maxCount: Int) : ExecutorService {
     val threadCount = AtomicInteger(1)
