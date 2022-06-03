@@ -32,13 +32,9 @@ class BasicRequestHandler : IRequestHandler {
         this.client = context.httpClient as HttpClient
     }
 
-    override fun onRequest(request: MessageGroup) {
-        val httpRequest = request.toRequest()
-        val httpResponse = client.send(httpRequest)
-
-        httpRequest.body.ifPresent(BodyReader::tryClose)
-        httpResponse.body.ifPresent(BodyReader::tryClose)
-    }
+    override fun onRequest(request: MessageGroup) = request.toRequest().also {
+        client.send(it)
+    }.body.ifPresent(BodyReader::tryClose)
 
     override fun close() {}
 }

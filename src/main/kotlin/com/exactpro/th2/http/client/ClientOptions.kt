@@ -88,15 +88,14 @@ internal class ClientOptions(
         return httpRequest
     }
 
-    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> = try {
-        httpResponse.eagerly().also { logger.debug { "Received response on socket '$socket': $it" } }
-    } catch (e: Throwable) {
-        throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
-    } finally {
+    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> {
+        val shouldClose = RawHttpResponse.shouldCloseConnectionAfter(httpResponse)
+        val resultResponse = httpResponse.eagerly(shouldClose).also { logger.debug { "Received response on socket '$socket': $it" } }
         when {
-            RawHttpResponse.shouldCloseConnectionAfter(httpResponse) -> removeSocket(socket)
+            shouldClose -> removeSocket(socket)
             httpResponse.statusCode != 100 -> socketPool.release(socket)
         }
+        return resultResponse
     }
 
     override fun getSocket(uri: URI): Socket = socketPool.acquire()
