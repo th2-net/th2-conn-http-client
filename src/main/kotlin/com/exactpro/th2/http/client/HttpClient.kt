@@ -135,8 +135,13 @@ class HttpClient(
     }
 
     private fun sendRequest(request: RawHttpRequest): RawHttpResponse<Void> {
+        val isHttp11 = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1)
         val socket: Socket = try {
-            options.getSocket(request.uri)
+            options.getSocket(request.uri).apply {
+                if (isHttp11 || request.headers.getFirst("Connection").orElseGet { "" } == "Keep-Alive") {
+                    this.keepAlive = true
+                }
+            }
         } catch (e: RuntimeException) {
             logger.error(e) { "Cannot open socket due to network error" }
             throw e
@@ -144,7 +149,7 @@ class HttpClient(
 
         try {
             val finalRequest = options.onRequest(request)
-            val expectContinue = !finalRequest.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1) && finalRequest.expectContinue()
+            val expectContinue = isHttp11 && finalRequest.expectContinue()
 
             val outputStream = socket.getOutputStream()
             val inputStream = socket.getInputStream()
