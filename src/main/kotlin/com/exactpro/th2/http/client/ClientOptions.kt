@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.http.client.util.createExecutorService
 import mu.KotlinLogging
 import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
@@ -26,12 +27,8 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.Semaphore
-import java.util.concurrent.SynchronousQueue
-import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
 import kotlin.concurrent.withLock
@@ -58,27 +55,7 @@ internal class ClientOptions(
         }
     }
 
-    private val executorService: ExecutorService = run {
-        val counter = AtomicInteger(1)
-        ThreadPoolExecutor(maxParallelRequests, maxParallelRequests, 0L, TimeUnit.MILLISECONDS, SynchronousQueue()) { runnable: Runnable? ->
-            Thread(runnable).apply {
-                isDaemon = true
-                name = "tcp-th2-client-" + counter.incrementAndGet()
-            }
-        }.apply {
-            setRejectedExecutionHandler { runnable, threadPoolExecutor ->
-                try {
-                    // Wait until queue is ready, don`t throw reject
-                    threadPoolExecutor.queue.put(runnable)
-                    if (threadPoolExecutor.isShutdown) {
-                        throw RejectedExecutionException("Task $runnable rejected from $threadPoolExecutor due shutdown")
-                    }
-                } catch (e: InterruptedException) {
-                    throw RejectedExecutionException("Task $runnable rejected from $threadPoolExecutor", e)
-                }
-            }
-        }
-    }
+    private val executorService: ExecutorService = createExecutorService(maxParallelRequests)
 
     override fun getExecutorService() = this.executorService
 

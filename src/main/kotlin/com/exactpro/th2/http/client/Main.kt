@@ -44,6 +44,7 @@ import com.exactpro.th2.http.client.api.impl.BasicStateManager
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.CertificateConverter
 import com.exactpro.th2.http.client.util.PrivateKeyConverter
+import com.exactpro.th2.http.client.util.createExecutorService
 import com.exactpro.th2.http.client.util.storeEvent
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toRawMessage
@@ -63,7 +64,6 @@ import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.SECONDS
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
@@ -272,13 +272,3 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
 private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
-
-private fun createExecutorService(maxCount: Int) : ExecutorService {
-    val threadCount = AtomicInteger(1)
-    return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
-        Thread(runnable).apply {
-            isDaemon = true
-            name = "th2-http-client-${threadCount.incrementAndGet()}"
-        }
-    }
-}
