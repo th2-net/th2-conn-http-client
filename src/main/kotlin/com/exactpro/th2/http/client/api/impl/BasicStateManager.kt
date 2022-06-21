@@ -28,6 +28,7 @@ import kotlin.text.Charsets.UTF_8
 class BasicStateManager : IStateManager {
     private lateinit var client: RawHttpClient<*>
     private var settings: BasicAuthSettings? = null
+    private val authHeader = settings?.run { "Basic ${Base64.getEncoder().encodeToString("${username}:${password}".toByteArray(UTF_8))}" } ?: ""
 
     override fun init(context: StateManagerContext) {
         check(!::client.isInitialized) { "State manager is already initialized" }
@@ -40,10 +41,8 @@ class BasicStateManager : IStateManager {
     override fun onStart() {}
 
     override fun prepareRequest(request: RawHttpRequest): RawHttpRequest = settings?.run {
-        val credentials = "${username}:${password}".toByteArray(UTF_8)
-        val authHeader = "Basic ${Base64.getEncoder().encodeToString(credentials)}"
-        val headersWithAuth = RawHttpHeaders.newBuilder(request.headers).overwrite("Authorization", authHeader).build()
-        request.withHeaders(headersWithAuth)
+        val headersWithAuth = RawHttpHeaders.newBuilderSkippingValidation(request.headers).overwrite("Authorization", authHeader).build()
+        RawHttpRequest(request.startLine, headersWithAuth, request.body.orElse(null), request.senderAddress.orElse(null))
     } ?: request
 
     override fun onResponse(response: RawHttpResponse<*>) {}

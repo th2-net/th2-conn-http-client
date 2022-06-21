@@ -18,12 +18,12 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
+import com.exactpro.th2.http.client.util.parseResponseEagerly
 import com.exactpro.th2.http.client.util.tryClose
 import mu.KotlinLogging
 import rawhttp.core.HttpVersion
 import rawhttp.core.IOSupplier
 import rawhttp.core.RawHttp
-import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.body.BodyReader
@@ -37,12 +37,11 @@ import kotlin.concurrent.withLock
 
 class HttpClient(
     https: Boolean,
-    private val host: String,
-    private val port: Int,
+    host: String,
+    port: Int,
     readTimeout: Int,
     keepAliveTimeout: Long,
     maxParallelRequests: Int,
-    private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
@@ -99,28 +98,8 @@ class HttpClient(
     override fun send(request: RawHttpRequest): RawHttpResponse<Void> {
         if (!isRunning) start()
 
-        val sendRequest = request.run {
-            when {
-                host != uri.host || port != uri.port -> withRequestLine(startLine.withHost("$host:$port"))
-                else -> this
-            }
-        }
-
-        val preparedRequest = sendRequest.runCatching(prepareRequest).getOrElse {
+        val preparedRequest = request.runCatching(prepareRequest).getOrElse {
             throw IllegalStateException("Failed to prepare request: $request", it)
-        }.run {
-            when {
-                defaultHeaders.isEmpty() -> this
-                defaultHeaders.keys.all(headers::contains) -> this
-                else -> withHeaders(RawHttpHeaders.newBuilder(headers).run {
-                    defaultHeaders.forEach { (header, values) ->
-                        if (!headers.contains(header)) {
-                            values.forEach { value -> with(header, value) }
-                        }
-                    }
-                    build()
-                })
-            }
         }
 
         val response = try {
@@ -156,7 +135,7 @@ class HttpClient(
             options.executorService.execute(requestSender(finalRequest, outputStream, expectContinue))
 
             val response = if (expectContinue) {
-                val responseWaiter = ResponseWaiter { rawHttp.parseResponse(inputStream, finalRequest.startLine) }
+                val responseWaiter = ResponseWaiter { rawHttp.parseResponseEagerly(inputStream, finalRequest.startLine) }
                 if (options.shouldContinue(responseWaiter)) {
                     finalRequest.body.get().writeTo(outputStream)
                     responseWaiter.call()
@@ -164,13 +143,13 @@ class HttpClient(
                     throw RuntimeException("Unable to obtain a response due to a 100-continue " + "request not being continued")
                 }
             } else {
-                rawHttp.parseResponse(inputStream, finalRequest.startLine)
+                rawHttp.parseResponseEagerly(inputStream, finalRequest.startLine)
             }
 
             return when (response.statusCode) {
                 100 -> {
                     options.onResponse(socket, finalRequest.uri, response)
-                    options.onResponse(socket, finalRequest.uri, rawHttp.parseResponse(socket.getInputStream(), finalRequest.startLine))
+                    options.onResponse(socket, finalRequest.uri, rawHttp.parseResponseEagerly(socket.getInputStream(), finalRequest.startLine))
                 }
                 else -> options.onResponse(socket, finalRequest.uri, response)
             }

@@ -17,6 +17,7 @@
 package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.Certificate
+import com.exactpro.th2.http.client.util.HOST_HEADER
 import rawhttp.core.HttpVersion.HTTP_1_1
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
@@ -36,7 +37,6 @@ fun get(
         readTimeout = 5000,
         keepAliveTimeout = 15000,
         maxParallelRequests = 5,
-        defaultHeaders = mapOf(),
         prepareRequest = { it },
         onRequest = {},
         onResponse = { _, _ -> },
@@ -47,7 +47,9 @@ fun get(
     return client.send(
         RawHttpRequest(
             RequestLine("GET", URI("/"), HTTP_1_1),
-            RawHttpHeaders.empty(),
+            RawHttpHeaders.newBuilder().apply {
+                with(HOST_HEADER, "$host:443")
+            }.build(),
             null,
             null
         )

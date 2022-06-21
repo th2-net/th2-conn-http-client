@@ -17,10 +17,12 @@
 package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.createExecutorService
+import com.exactpro.th2.http.client.util.tryClose
 import mu.KotlinLogging
 import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
+import rawhttp.core.body.BodyReader
 import rawhttp.core.client.TcpRawHttpClient
 import java.net.Socket
 import java.net.URI
@@ -66,13 +68,16 @@ internal class ClientOptions(
     }
 
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> {
+        logger.debug { "Received response on socket '$socket': $httpResponse" }
         val shouldClose = RawHttpResponse.shouldCloseConnectionAfter(httpResponse)
-        val resultResponse = httpResponse.eagerly(!shouldClose).also { logger.debug { "Received response on socket '$socket': $it" } }
         when {
-            shouldClose -> removeSocket(socket)
+            shouldClose -> {
+                httpResponse.body.ifPresent(BodyReader::tryClose)
+                removeSocket(socket)
+            }
             httpResponse.statusCode != 100 -> socketPool.release(socket)
         }
-        return resultResponse
+        return httpResponse.eagerly()
     }
 
     override fun getSocket(uri: URI): Socket = socketPool.acquire()

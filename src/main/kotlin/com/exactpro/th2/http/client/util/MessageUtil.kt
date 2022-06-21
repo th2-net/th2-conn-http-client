@@ -41,6 +41,7 @@ import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
 import rawhttp.core.RequestLine
+import rawhttp.core.UriUtil
 import rawhttp.core.body.EagerBodyReader
 import java.io.ByteArrayOutputStream
 import java.net.URI
@@ -63,14 +64,15 @@ private const val DEFAULT_URI = "/"
 
 private const val CONTENT_TYPE_HEADER = "Content-Type"
 const val CONTENT_LENGTH_HEADER = "Content-Length"
+const val HOST_HEADER = "Host"
 private const val HEADER_VALUE_SEPARATOR = ";"
 
-private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
+private fun createRequest(head: Message, body: RawMessage, host: String, defaultHeaders: Map<String, List<String>>): RawHttpRequest {
     val metadata = body.metadata.propertiesMap
     val method = (head.getString(METHOD_FIELD) ?: metadata[METHOD_PROPERTY])?.uppercase() ?: DEFAULT_METHOD
     val uri = head.getString(URI_FIELD) ?: metadata[URI_PROPERTY] ?: DEFAULT_URI
 
-    val httpRequestLine = RequestLine(method, URI(uri), HTTP_1_1)
+    val httpRequestLine = RequestLine(method, UriUtil.withHost(URI(uri), host), HTTP_1_1)
     val httpHeaders = RawHttpHeaders.newBuilder()
 
     head.getList(HEADERS_FIELD)?.forEach {
@@ -82,7 +84,9 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     }
 
     val httpBody = body.body.toByteArray().takeIf(ByteArray::isNotEmpty)?.run {
-        if (CONTENT_TYPE_HEADER !in httpHeaders.headerNames) {
+        val headerNames = httpHeaders.headerNames
+
+        if (CONTENT_TYPE_HEADER !in headerNames) {
             metadata[CONTENT_TYPE_PROPERTY]?.run {
                 split(HEADER_VALUE_SEPARATOR).forEach {
                     httpHeaders.with(CONTENT_TYPE_HEADER, it.trim())
@@ -90,8 +94,18 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
             }
         }
 
-        if (CONTENT_LENGTH_HEADER !in httpHeaders.headerNames) {
+        if (CONTENT_LENGTH_HEADER !in headerNames) {
             httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
+        }
+
+        if (HOST_HEADER !in headerNames) {
+            httpHeaders.with(HOST_HEADER, host)
+        }
+
+        defaultHeaders.forEach { key, values ->
+            if (!headerNames.contains(key)) {
+                values.forEach { httpHeaders.with(key, it) }
+            }
         }
 
         EagerBodyReader(this)
@@ -117,19 +131,19 @@ private fun AnyMessage.toRaw(name: String): RawMessage = run {
     rawMessage
 }
 
-fun MessageGroup.toRequest(): RawHttpRequest = when (messagesCount) {
+fun MessageGroup.toRequest(host: String, defaultHeaders: Map<String, List<String>>): RawHttpRequest = when (messagesCount) {
     0 -> error("Message group is empty")
     1 -> getMessages(0).run {
         when {
-            hasMessage() -> createRequest(message.requireType(REQUEST_MESSAGE), RawMessage.getDefaultInstance())
-            hasRawMessage() -> createRequest(Message.getDefaultInstance(), rawMessage)
+            hasMessage() -> createRequest(message.requireType(REQUEST_MESSAGE), RawMessage.getDefaultInstance(), host, defaultHeaders)
+            hasRawMessage() -> createRequest(Message.getDefaultInstance(), rawMessage, host, defaultHeaders)
             else -> error("Single message in group is neither parsed nor raw: ${toPrettyString()}")
         }
     }
     2 -> {
         val head = getMessages(0).toParsed("Head").requireType(REQUEST_MESSAGE)
         val body = getMessages(1).toRaw("Body")
-        createRequest(head, body)
+        createRequest(head, body, host, defaultHeaders)
     }
     else -> error("Message group contains more than 2 messages")
 }
@@ -138,7 +152,7 @@ private inline operator fun <T : Builder> T.invoke(block: T.() -> Unit) = apply(
 
 fun MessageOrBuilder.toPrettyString(): String = JsonFormat.printer().omittingInsignificantWhitespace().includingDefaultValueFields().print(this)
 
-fun RawMessage.Builder.toBatch() = run(AnyMessage.newBuilder()::setRawMessage)
+fun RawMessage.Builder.toBatch(): MessageGroupBatch = run(AnyMessage.newBuilder()::setRawMessage)
     .run(MessageGroup.newBuilder()::addMessages)
     .run(MessageGroupBatch.newBuilder()::addGroups)
     .build()

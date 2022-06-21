@@ -24,14 +24,19 @@ import com.exactpro.th2.http.client.util.toRequest
 
 class BasicRequestHandler : IRequestHandler {
     private lateinit var client: HttpClient
+    private lateinit var host: String
+    private lateinit var defaultHeaders: Map<String, List<String>>
 
     override fun init(context: RequestHandlerContext) {
         check(!::client.isInitialized) { "Request handler is already initialized" }
         this.client = context.httpClient as HttpClient
+
+        this.defaultHeaders = context.defaultHeaders
+        this.host = context.host
     }
 
     override fun onRequest(request: MessageGroup) {
-        client.send(request.toRequest())
+        client.send(request.toRequest(host, defaultHeaders))
     }
 
     override fun close() {}

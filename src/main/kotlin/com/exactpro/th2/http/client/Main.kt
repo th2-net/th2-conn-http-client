@@ -169,7 +169,6 @@ fun run(
         settings.readTimeout,
         settings.keepAliveTimeout,
         settings.maxParallelRequests,
-        settings.defaultHeaders,
         stateManager::prepareRequest,
         onRequest,
         onResponse,
@@ -190,7 +189,7 @@ fun run(
 
     requestHandler.runCatching {
         registerResource("request-handler", ::close)
-        init(RequestHandlerContext(client))
+        init(RequestHandlerContext(client, "${settings.host}:${settings.port}", settings.defaultHeaders))
     }.onFailure {
         LOGGER.error(it) { "Failed to init request handler" }
         eventBatcher.storeEvent("Failed to init request handler", "Error", rootEventId, it)

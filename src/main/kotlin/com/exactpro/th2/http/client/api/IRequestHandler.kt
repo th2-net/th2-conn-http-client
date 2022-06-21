@@ -34,5 +34,5 @@ interface IRequestHandler : AutoCloseable {
      */
     fun onRequest(request: MessageGroup)
 
-    data class RequestHandlerContext(val httpClient: RawHttpClient<*>)
+    data class RequestHandlerContext(val httpClient: RawHttpClient<*>, val host: String, val defaultHeaders: Map<String, List<String>>)
 }
