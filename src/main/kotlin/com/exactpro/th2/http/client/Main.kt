@@ -141,10 +141,14 @@ fun run(
             Direction.SECOND -> SECOND
             else -> error("Unsupported direction $direction")
         }.toString())
-    })
+    }).also {
+        registerResource("Message batcher", it::close)
+    }
 
     val eventBatcher = EventBatcher(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService) { batch ->
         eventRouter.send(batch)
+    }.also {
+        registerResource("Event batcher", it::close)
     }
 
     val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
