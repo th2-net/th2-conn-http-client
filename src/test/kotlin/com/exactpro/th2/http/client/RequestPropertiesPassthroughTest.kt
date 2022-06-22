@@ -60,16 +60,15 @@ class RequestPropertiesPassthroughTest {
             }
         }.build()
 
-        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
         val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
-                .toRequest("", emptyMap())
-                .withRequestLine(requestLine)
+                .toRequest("localhost:25565", emptyMap())
                 .withBody(null)
                 .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
         if (request is Th2RawHttpRequest) {
             assertEquals(parentEventId, request.parentEventId)
             assertEquals(metadataProperties, request.metadataProperties)
+            assertEquals("localhost:25565", request.headers.getFirst("Host").get())
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }

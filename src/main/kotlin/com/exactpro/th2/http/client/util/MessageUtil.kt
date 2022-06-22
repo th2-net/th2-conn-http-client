@@ -83,8 +83,9 @@ private fun createRequest(head: Message, body: RawMessage, host: String, default
         httpHeaders.with(name, value)
     }
 
+    val headerNames = httpHeaders.headerNames
+
     val httpBody = body.body.toByteArray().takeIf(ByteArray::isNotEmpty)?.run {
-        val headerNames = httpHeaders.headerNames
 
         if (CONTENT_TYPE_HEADER !in headerNames) {
             metadata[CONTENT_TYPE_PROPERTY]?.run {
@@ -98,17 +99,17 @@ private fun createRequest(head: Message, body: RawMessage, host: String, default
             httpHeaders.with(CONTENT_LENGTH_HEADER, size.toString())
         }
 
-        if (HOST_HEADER !in headerNames) {
-            httpHeaders.with(HOST_HEADER, host)
-        }
-
-        defaultHeaders.forEach { key, values ->
-            if (!headerNames.contains(key)) {
-                values.forEach { httpHeaders.with(key, it) }
-            }
-        }
-
         EagerBodyReader(this)
+    }
+
+    if (HOST_HEADER !in headerNames) {
+        httpHeaders.with(HOST_HEADER, host)
+    }
+
+    defaultHeaders.forEach { (key, values) ->
+        if (!headerNames.contains(key)) {
+            values.forEach { httpHeaders.with(key, it) }
+        }
     }
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
