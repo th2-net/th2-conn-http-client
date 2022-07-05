@@ -14,7 +14,6 @@ import com.exactpro.th2.http.server.api.impl.BasicStateManager
 import com.exactpro.th2.http.server.options.Th2ServerOptions
 import com.exactpro.th2.http.server.util.LinkedData
 import io.netty.channel.nio.NioEventLoopGroup
-import mu.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import rawhttp.core.EagerHttpResponse
@@ -34,13 +33,13 @@ import java.io.InputStream
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
 
 abstract class ServerIncluded {
     companion object {
-        private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
+        //private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
 
-        private const val serverPort = 8086
+        private const val serverPort = 25565
+        private const val corePoolSize = 12
         private const val responseBody = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
 
         private val rawHttp = RawHttp()
@@ -53,18 +52,13 @@ abstract class ServerIncluded {
                     "CONNECT" -> createResponse(false, false)
                     else -> createResponse()
                 }
-                LOGGER.debug { "Response string created: \n$stringResponse" }
+                //LOGGER.debug { "Response string created: \n$stringResponse" }
                 val response = EagerHttpResponse.from(rawHttp.parseResponse(stringResponse, LinkedData(uuid, EventID.getDefaultInstance(), null)))
 
                 server.handleResponse(response)
             }
         }
-        private val server = HttpServer(Th2ServerOptions(Main.Companion.MicroserviceSettings(port = serverPort, sessionAlias = "test_alias", customSettings = null), stateManager = stateManager, onEvent = {_,_ -> ""}, onRequest = {
-            //LOGGER.info { "stateManager Server: request -> ${it.body.toStringUtf8()}" }
-        }, onResponse = {
-            //LOGGER.info { "stateManager Server: response -> ${it.body.toStringUtf8()}" }
-        }), 2000, 2000)
-        private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(3)
+        private lateinit var server: HttpServer
 
         private fun createResponse(withBody: Boolean = true, withBodyHeaders: Boolean = withBody): String {
             return """HTTP/1.1 200 OK ${if (withBodyHeaders) "\nContent-Type: plain/text\nContent-Length:  ${if (withBody) responseContentLength else "0"}" else "\nContent-Length: 0"}${if (withBody) "\n\n$responseBody" else ""}""".trimIndent()
@@ -98,6 +92,7 @@ abstract class ServerIncluded {
         @BeforeAll
         @JvmStatic
         fun setUp() {
+            server = HttpServer(Th2ServerOptions(Main.Companion.MicroserviceSettings(port = serverPort, sessionAlias = "test_alias", customSettings = null), stateManager = stateManager, onEvent = {_,_ -> ""}, onRequest = {}, onResponse = {}), 1000, 2000)
             server.start()
         }
 
@@ -116,9 +111,9 @@ abstract class ServerIncluded {
             DummyManglerFactory.DummyMangler,
             onEvent = { _, _ -> },
             onMessage = { },
-            executor,
-            NioEventLoopGroup(10, executor),
-            TaskSequencePool(executor),
+            Executors.newScheduledThreadPool(corePoolSize),
+            NioEventLoopGroup(10, Executors.newScheduledThreadPool(corePoolSize)),
+            TaskSequencePool(Executors.newScheduledThreadPool(corePoolSize)),
             EventID.getDefaultInstance()
         )
     }

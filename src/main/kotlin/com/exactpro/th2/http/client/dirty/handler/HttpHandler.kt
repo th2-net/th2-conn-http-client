@@ -3,7 +3,6 @@ package com.exactpro.th2.http.client.dirty.handler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IContext
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
-import com.exactpro.th2.http.client.dirty.handler.codec.Th2HttpResponseDecoder
 import com.exactpro.th2.http.client.dirty.handler.state.IStateManager
 import io.netty.buffer.ByteBuf
 import io.netty.channel.embedded.EmbeddedChannel
@@ -13,19 +12,19 @@ import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpHeaders.Names.CONNECTION
 import io.netty.handler.codec.http.HttpMessage
+import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpRequestDecoder
 import io.netty.handler.codec.http.HttpRequestEncoder
 import mu.KotlinLogging
 import java.nio.charset.Charset
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val clientHandler: IStateManager): IProtocolHandler {
 
     private val requestAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
-
-    private val responseDecoder = Th2HttpResponseDecoder()
-    private val framingOutput: MutableList<Any> = mutableListOf()
 
     private val requestDecoder = HttpRequestDecoder().apply {
         (this as ByteToMessageDecoder).setCumulator { _, cumulation, `in` ->
@@ -35,7 +34,12 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
     private val requestEncoder = HttpRequestEncoder()
     private val httpClientCodec = HttpClientCodec()
-    private var shouldCloseChannel = false
+
+    private val httpMode = AtomicReference(HttpMode.DEFAULT)
+    private val lastMethod = AtomicReference<HttpMethod?>(null)
+
+    private var isLastResponse = AtomicBoolean(false)
+
 
     private val httpClientChannel: EmbeddedChannel = EmbeddedChannel().apply {
         this.pipeline().addLast("client", httpClientCodec).addLast("aggregator", responseAggregator)
@@ -47,62 +51,70 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     private val settings: HttpHandlerSettings = context.settings as HttpHandlerSettings
 
     override fun onIncoming(message: ByteBuf): Map<String, String> {
-        val response = httpClientChannel.readInbound<FullHttpResponse>()
-        if (response.decoderResult.isFailure) {
-            throw error(response.decoderResult.cause().message ?: "Error during response decode")
-        }
-        LOGGER.info { "Received response: $response" }
-        response.headers().let { headers ->
-            when {
-                shouldCloseChannel -> context.channel.close()
-                response.keepAlive() -> Unit
-                else -> context.channel.close() // all else are closing cases
+        when (val mode = httpMode.get()) {
+            HttpMode.DEFAULT -> {
+                val response = httpClientChannel.readInbound<FullHttpResponse>()
+                if (response.decoderResult().isFailure) {
+                    throw response.decoderResult().cause()
+                }
+                LOGGER.info { "Received response: $response" }
+                when {
+                    isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
+                    response.keepAlive() -> Unit
+                    else -> context.channel.close() // all else are closing cases
+                }
+
+                when(lastMethod.get()) {
+                    HttpMethod.CONNECT -> if (response.status().code() == 200) httpMode.set(HttpMode.CONNECT)
+                }
+
+                clientHandler.onResponse(response)
+                response.content().release()
             }
+            HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
+            else -> error("Unsupported http mode: $mode")
         }
-        clientHandler.onResponse(response)
-        response.content().release()
+
         return mutableMapOf()
     }
 
     override fun onOutgoing(message: ByteBuf, metadata: MutableMap<String, String>) {
-        LOGGER.debug { "\n------------> Request: " + message.toString(Charset.defaultCharset()) }
+        when (val mode = httpMode.get()) {
+            HttpMode.DEFAULT -> {
+                val newMessage = handleRequest(message) { request ->
+                    isLastResponse.set(!request.keepAlive())
 
-        val newMessage = handleRequest(message) { request ->
-            LOGGER.info { "Sending request: $request" }
-            shouldCloseChannel = !request.keepAlive()
-
-            request.headers().let { headers ->
-                settings.defaultHeaders.forEach {
-                    if (!headers.contains(it.key)) {
-                        headers.add(it.key, it.value)
+                    request.headers().let { headers ->
+                        settings.defaultHeaders.forEach {
+                            if (!headers.contains(it.key)) {
+                                headers.add(it.key, it.value)
+                            }
+                        }
                     }
+
+                    lastMethod.set(request.method())
+
+                    clientHandler.onRequest(request)
+                }
+
+                if (newMessage.writerIndex() != message.writerIndex()) {
+                    message.clear().writeBytes(newMessage)
                 }
             }
-            clientHandler.onRequest(request)
-        }
-        LOGGER.debug { "\n------------> Final Request: " + newMessage.toString(Charset.defaultCharset()) }
-
-        if (newMessage.writerIndex() != message.writerIndex()) {
-            message.clear().writeBytes(newMessage)
+            HttpMode.CONNECT -> LOGGER.trace { "$mode: Sending data passing as tcp package" }
+            else -> error("Unsupported http mode: $mode")
         }
     }
 
     override fun onReceive(buffer: ByteBuf) = if (handleResponseParts(buffer)) {
-        try {
-            buffer.retainedDuplicate().readerIndex(0)
-        } finally {
-            //buffer.release()
-        }
+        buffer.retainedDuplicate().readerIndex(0)
     } else {
         null
     }
 
     private fun handleResponseParts(buffer: ByteBuf): Boolean {
-        val startIdx = responseDecoder.decode0(buffer, framingOutput)
-        if(startIdx >= 0 || !context.channel.isOpen && framingOutput.isNotEmpty()) {
-            httpClientChannel.writeInbound(buffer.readerIndex(0).retain())
-        }
-        return httpClientChannel.inboundMessages().size > 0
+        httpClientChannel.writeInbound(buffer.readBytes(buffer.writerIndex()-buffer.readerIndex()))
+        return httpClientChannel.inboundMessages().size > 0 && httpClientChannel.inboundMessages().peek() is FullHttpResponse
     }
 
     private fun handleRequest(message: ByteBuf, handler: (FullHttpRequest) -> Unit): ByteBuf = runCatching {
@@ -125,8 +137,8 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     override fun onClose() {
-        if (shouldCloseChannel) {
-            LOGGER.debug { "Closing channel due last request" }
+        if (isLastResponse.get() || lastMethod.get() == HttpMethod.CONNECT) {
+            LOGGER.debug { "Closing channel due last response" }
             this.context.channel.close()
         }
     }
@@ -140,5 +152,10 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     companion object {
         private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
         const val DEFAULT_MAX_LENGTH_AGGREGATOR = 65536
+    }
+
+    private enum class HttpMode {
+        CONNECT,
+        DEFAULT
     }
 }
