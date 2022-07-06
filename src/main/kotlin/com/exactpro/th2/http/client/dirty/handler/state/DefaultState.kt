@@ -18,5 +18,5 @@ class DefaultStateFactory : IStateFactory {
         get() = DefaultStateFactory::class.java.simpleName
     override val settings: Class<DefaultStateSettings>
         get() = DefaultStateSettings::class.java
-    override fun create(context: IStateSettings?): IState = DefaultState(settings as? DefaultStateSettings)
+    override fun create(settings: IStateSettings?): IState = DefaultState(settings as? DefaultStateSettings)
 }

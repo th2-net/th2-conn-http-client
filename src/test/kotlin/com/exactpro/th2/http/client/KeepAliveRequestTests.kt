@@ -17,7 +17,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `GET response test`() = simpleTest { port ->
+    fun `GET response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -33,7 +33,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `POST response test`() = simpleTest { port ->
+    fun `POST response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -49,7 +49,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `PUT response test`() = simpleTest { port ->
+    fun `PUT response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -65,7 +65,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `DELETE response test`() = simpleTest { port ->
+    fun `DELETE response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -81,7 +81,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `TRACE response test`() = simpleTest { port ->
+    fun `TRACE response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 this += RawHttpRequest(RequestLine("TRACE", URI("/test"), HttpVersion.HTTP_1_1), RawHttpHeaders.newBuilder()
@@ -95,7 +95,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `PATCH response test`() = simpleTest { port ->
+    fun `PATCH response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -111,7 +111,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `OPTIONS response test`() = simpleTest { port ->
+    fun `OPTIONS response test`() = simpleTest(serverPort) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""
@@ -127,7 +127,7 @@ class KeepAliveRequestTests : ServerIncluded() {
     }
 
     @Test
-    fun `HEAD response test`() = simpleTest(false, true) { port ->
+    fun `HEAD response test`() = simpleTest(serverPort,false, true) { port ->
         mutableListOf<RawHttpRequest>().apply {
             repeat(`test request count`) {
                 val body = """{ "key":"$it" }"""

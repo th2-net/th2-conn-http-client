@@ -30,5 +30,5 @@ interface IStateFactory {
      * @param context entity context
      * @return entity instance
      */
-    fun create(context: IStateSettings?): IState
+    fun create(settings: IStateSettings?): IState
 }

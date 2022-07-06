@@ -30,15 +30,14 @@ import rawhttp.core.errors.InvalidHttpResponse
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
 
 abstract class ServerIncluded {
     companion object {
         //private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
 
-        private const val serverPort = 25565
+        @JvmStatic
+        protected val serverPort = 25565
         private const val corePoolSize = 12
         private const val responseBody = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
 
@@ -101,20 +100,5 @@ abstract class ServerIncluded {
         fun finish() {
             server.stop()
         }
-
-        fun createClient(handler: HttpHandler): IChannel = Channel(
-            InetSocketAddress("localhost", serverPort),
-            false,
-            "alias",
-            1000,
-            handler,
-            DummyManglerFactory.DummyMangler,
-            onEvent = { _, _ -> },
-            onMessage = { },
-            Executors.newScheduledThreadPool(corePoolSize),
-            NioEventLoopGroup(corePoolSize, Executors.newScheduledThreadPool(corePoolSize)),
-            TaskSequencePool(Executors.newScheduledThreadPool(corePoolSize)),
-            EventID.getDefaultInstance()
-        )
     }
 }

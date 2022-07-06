@@ -21,7 +21,7 @@ import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val clientHandler: IState): IProtocolHandler {
+open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val state: IState, private val settings: HttpHandlerSettings): IProtocolHandler {
 
     private val requestAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
@@ -48,7 +48,6 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     private val requestChannel: EmbeddedChannel = EmbeddedChannel().apply {
         this.pipeline().addLast("decoder", requestDecoder).addLast("aggregator", requestAggregator).addLast("encoder", requestEncoder)
     }
-    private val settings: HttpHandlerSettings = context.settings as HttpHandlerSettings
 
     override fun onIncoming(message: ByteBuf): Map<String, String> {
         when (val mode = httpMode.get()) {
@@ -68,7 +67,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                     HttpMethod.CONNECT -> if (response.status().code() == 200) httpMode.set(HttpMode.CONNECT)
                 }
 
-                clientHandler.onResponse(response)
+                state.onResponse(response)
                 response.content().release()
             }
             HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
@@ -94,7 +93,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
                     lastMethod.set(request.method())
 
-                    clientHandler.onRequest(request)
+                    state.onRequest(request)
                 }
 
                 if (newMessage.writerIndex() != message.writerIndex()) {
@@ -137,6 +136,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     override fun onClose() {
+        state.onClose()
         if (isLastResponse.get() || lastMethod.get() == HttpMethod.CONNECT) {
             LOGGER.debug { "Closing channel due last response" }
             this.context.channel.close()
@@ -144,10 +144,14 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     override fun close() {
+        state.close()
         httpClientChannel.close()
         requestChannel.close()
     }
 
+    override fun onOpen() {
+        state.onOpen()
+    }
 
     companion object {
         private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
