@@ -112,7 +112,7 @@ abstract class ServerIncluded {
             onEvent = { _, _ -> },
             onMessage = { },
             Executors.newScheduledThreadPool(corePoolSize),
-            NioEventLoopGroup(10, Executors.newScheduledThreadPool(corePoolSize)),
+            NioEventLoopGroup(corePoolSize, Executors.newScheduledThreadPool(corePoolSize)),
             TaskSequencePool(Executors.newScheduledThreadPool(corePoolSize)),
             EventID.getDefaultInstance()
         )
