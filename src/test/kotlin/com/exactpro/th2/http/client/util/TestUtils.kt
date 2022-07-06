@@ -3,7 +3,7 @@ package com.exactpro.th2.http.client.util
 import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.client.dirty.handler.HttpHandlerSettings
-import com.exactpro.th2.http.client.dirty.handler.state.IStateManager
+import com.exactpro.th2.http.client.dirty.handler.state.IState
 import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
@@ -35,7 +35,7 @@ fun simpleTest(withBody: Boolean = true, withBodyHeader: Boolean = withBody, get
     val testContext = TestContext(HttpHandlerSettings().apply {
         this.defaultHeaders = defaultHeaders
     })
-    val handler = mock<IStateManager>()
+    val handler = mock<IState>()
 
     val client = ServerIncluded.createClient(HttpHandler(testContext, handler))
     testContext.init(client)

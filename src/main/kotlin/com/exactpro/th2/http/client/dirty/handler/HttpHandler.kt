@@ -3,7 +3,7 @@ package com.exactpro.th2.http.client.dirty.handler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IContext
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
-import com.exactpro.th2.http.client.dirty.handler.state.IStateManager
+import com.exactpro.th2.http.client.dirty.handler.state.IState
 import io.netty.buffer.ByteBuf
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.ByteToMessageDecoder
@@ -21,7 +21,7 @@ import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val clientHandler: IStateManager): IProtocolHandler {
+open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val clientHandler: IState): IProtocolHandler {
 
     private val requestAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
@@ -114,7 +114,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
     private fun handleResponseParts(buffer: ByteBuf): Boolean {
         httpClientChannel.writeInbound(buffer.readBytes(buffer.writerIndex()-buffer.readerIndex()))
-        return httpClientChannel.inboundMessages().size > 0 && httpClientChannel.inboundMessages().peek() is FullHttpResponse
+        return httpClientChannel.inboundMessages().size > 0
     }
 
     private fun handleRequest(message: ByteBuf, handler: (FullHttpRequest) -> Unit): ByteBuf = runCatching {
