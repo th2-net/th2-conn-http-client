@@ -10,7 +10,6 @@ import io.netty.handler.codec.ByteToMessageDecoder
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
-import io.netty.handler.codec.http.HttpHeaders.Names.CONNECTION
 import io.netty.handler.codec.http.HttpMessage
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
@@ -59,7 +58,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                 LOGGER.info { "Received response: $response" }
                 when {
                     isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
-                    response.keepAlive() -> Unit
+                    response.isKeepAlive() -> Unit
                     else -> context.channel.close() // all else are closing cases
                 }
 
@@ -81,7 +80,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         when (val mode = httpMode.get()) {
             HttpMode.DEFAULT -> {
                 val newMessage = handleRequest(message) { request ->
-                    isLastResponse.set(!request.keepAlive())
+                    isLastResponse.set(!request.isKeepAlive())
 
                     request.headers().let { headers ->
                         settings.defaultHeaders.forEach {
@@ -131,7 +130,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         throw IllegalStateException("Failed to handle message: ${message.resetReaderIndex().readCharSequence(message.writerIndex(), Charset.defaultCharset())}", it)
     }
 
-    private fun HttpMessage.keepAlive() = headers().let { headers ->
+    private fun HttpMessage.isKeepAlive() = headers().let { headers ->
         protocolVersion().minorVersion() == 1 && !(headers.get(CONNECTION)?.equals("close", true) ?: false) || protocolVersion().minorVersion() == 0 && headers.get(CONNECTION)?.equals("keep-alive", true) ?: false
     }
 
@@ -156,6 +155,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     companion object {
         private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
         const val DEFAULT_MAX_LENGTH_AGGREGATOR = 65536
+        const val CONNECTION = "Connection"
     }
 
     private enum class HttpMode {

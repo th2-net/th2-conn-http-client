@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 
 class HttpHandlerSettings: IProtocolHandlerSettings {
-    var defaultHeaders: Map<String, String> = mapOf()
+    var defaultHeaders: Map<String, List<String>> = mapOf()
 
     @JsonDeserialize(using = StateSettingsDeserializer::class)
     var stateSettings: IStateSettings? = null

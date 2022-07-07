@@ -60,7 +60,7 @@ spec:
         sessionAlias: alias-test
         handler:
           defaultHeaders:
-            'Content-type': 'application/json'
+            'Content-type': [ 'application/json' ]
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
     auth:

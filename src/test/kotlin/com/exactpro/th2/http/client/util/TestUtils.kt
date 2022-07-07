@@ -34,7 +34,7 @@ fun simpleTestSingle(port: Int, withBody: Boolean = true, withBodyHeader: Boolea
 }
 
 fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = withBody, getRequests: (Int) -> List<RawHttpRequest>) {
-    val defaultHeaders = mapOf("Accept-Encoding" to "gzip, deflate")
+    val defaultHeaders = mapOf("Accept-Encoding" to listOf("gzip", "deflate"))
     val testContext = TestContext(HttpHandlerSettings().apply {
         this.defaultHeaders = defaultHeaders
     })
