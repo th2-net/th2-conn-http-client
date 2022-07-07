@@ -90,6 +90,9 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                                 headers.add(it.key, it.value)
                             }
                         }
+                        if (HOST !in headers) {
+                            headers.add(HOST, context.channel.address.let { "${it.hostString}:${it.port}" })
+                        }
                     }
 
                     lastMethod.set(request.method())
@@ -158,6 +161,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
         const val DEFAULT_MAX_LENGTH_AGGREGATOR = 65536
         const val CONNECTION = "Connection"
+        const val HOST = "Host"
     }
 
     private enum class HttpMode {
