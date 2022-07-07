@@ -59,13 +59,13 @@ spec:
         port: 80
         sessionAlias: alias-test
         handler:
+          stateSettings: #by default impl - auth settings
+            username: user
+            password: pwds
           defaultHeaders:
             'Content-type': [ 'application/json' ]
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
-    auth:
-      username: user
-      password: pwds
   type: th2-conn
   pins:
     - name: to_send

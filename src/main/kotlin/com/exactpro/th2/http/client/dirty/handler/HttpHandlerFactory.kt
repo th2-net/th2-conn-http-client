@@ -5,8 +5,10 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerFactory
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.state.DefaultStateFactory
 import com.exactpro.th2.http.client.dirty.handler.state.IStateFactory
+import com.google.auto.service.AutoService;
 import mu.KotlinLogging
 
+@AutoService(IProtocolHandlerFactory::class)
 class HttpHandlerFactory: IProtocolHandlerFactory {
 
     private val stateFactory = load<IStateFactory>(DefaultStateFactory::class.java).also {
