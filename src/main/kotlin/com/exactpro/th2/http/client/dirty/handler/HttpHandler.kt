@@ -57,7 +57,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                 if (response.decoderResult().isFailure) {
                     throw response.decoderResult().cause()
                 }
-                LOGGER.info { "Received response: $response" }
+                LOGGER.debug { "Received response: $response" }
                 when {
                     isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
                     response.isKeepAlive() -> Unit
@@ -98,6 +98,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                     lastMethod.set(request.method())
 
                     state.onRequest(request)
+                    LOGGER.debug { "Sending request request: $request" }
                 }
 
                 if (newMessage.writerIndex() != message.writerIndex()) {
@@ -142,9 +143,9 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     override fun onClose() {
         state.onClose()
         if (isLastResponse.get() || lastMethod.get() == HttpMethod.CONNECT) {
-            LOGGER.debug { "Closing channel due last response" }
-            this.context.channel.close()
+            LOGGER.debug { "Closing channel due last request/response" }
         }
+        this.context.channel.close()
     }
 
     override fun close() {

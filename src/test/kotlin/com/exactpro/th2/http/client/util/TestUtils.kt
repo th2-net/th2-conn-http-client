@@ -30,7 +30,7 @@ fun waitUntil(timeout: Long, step: Long = 100, check: () -> Boolean) {
 }
 
 fun simpleTestSingle(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = withBody, getRequest: (Int) -> RawHttpRequest) {
-    simpleTest(port, withBody, withBodyHeader) { port -> listOf(getRequest(port)) }
+    simpleTest(port, withBody, withBodyHeader) { listOf(getRequest(it)) }
 }
 
 fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = withBody, getRequests: (Int) -> List<RawHttpRequest>) {
