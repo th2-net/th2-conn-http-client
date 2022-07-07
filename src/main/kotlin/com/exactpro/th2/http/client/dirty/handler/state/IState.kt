@@ -6,7 +6,7 @@ import io.netty.handler.codec.http.FullHttpResponse
 interface IState: AutoCloseable {
     fun onOpen() = Unit
     fun onRequest(request: FullHttpRequest) = Unit
-    fun onResponse(request: FullHttpResponse) = Unit
+    fun onResponse(response: FullHttpResponse) = Unit
     fun onClose() = Unit
     override fun close() = Unit
 }
@@ -25,9 +25,9 @@ interface IStateFactory {
     val settings: Class<out IStateSettings>
 
     /**
-     * Creates an entity with provided [context]
+     * Creates an entity with provided [settings]
      *
-     * @param context entity context
+     * @param settings entity settings
      * @return entity instance
      */
     fun create(settings: IStateSettings?): IState

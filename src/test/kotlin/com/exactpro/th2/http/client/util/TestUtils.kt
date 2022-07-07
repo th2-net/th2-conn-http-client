@@ -1,7 +1,6 @@
 package com.exactpro.th2.http.client.util
 
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.conn.dirty.tcp.core.TaskSequencePool
 import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.conn.dirty.tcp.core.api.impl.Channel
 import com.exactpro.th2.conn.dirty.tcp.core.api.impl.DummyManglerFactory
@@ -14,9 +13,6 @@ import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
 import mu.KotlinLogging
 import org.junit.jupiter.api.Assertions
-import org.mockito.kotlin.argumentCaptor
-import org.mockito.kotlin.doNothing
-import org.mockito.kotlin.mock
 import rawhttp.core.RawHttpRequest
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
@@ -42,28 +38,36 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
     val testContext = TestContext(HttpHandlerSettings().apply {
         this.defaultHeaders = defaultHeaders
     })
-    val handler = mock<IState>()
 
-    val client = createClient(HttpHandler(testContext, handler, testContext.settings as HttpHandlerSettings), 10, port)
+    val state = object : IState {
+        val requests = mutableListOf<FullHttpRequest>()
+        val responses = mutableListOf<FullHttpResponse>()
+
+        override fun onResponse(response: FullHttpResponse) {
+            responses.add(response)
+        }
+
+        override fun onRequest(request: FullHttpRequest) {
+            requests.add(request)
+        }
+    }
+
+    val client = createClient(HttpHandler(testContext, state, testContext.settings as HttpHandlerSettings), 10, port)
     testContext.init(client)
 
     val requests = getRequests(port)
     try {
         requests.forEachIndexed { index, request ->
-            val requestCaptor = argumentCaptor<FullHttpRequest>()
-            val responseCaptor = argumentCaptor<FullHttpResponse>()
-
-            doNothing().`when`(handler).onResponse(responseCaptor.capture())
-            doNothing().`when`(handler).onRequest(requestCaptor.capture())
+            if (!client.isOpen) client.open()
 
             client.send(request, mapOf())
 
             waitUntil(2500) {
-                responseCaptor.allValues.isNotEmpty()
+                state.responses.isNotEmpty()
             }
-            Assertions.assertEquals(1, requestCaptor.allValues.size)
-            Assertions.assertEquals(1, responseCaptor.allValues.size)
-            responseCaptor.firstValue.also { resultResponse ->
+            Assertions.assertEquals(1, state.requests.size)
+            Assertions.assertEquals(1, state.responses.size)
+            state.responses.first().also { resultResponse ->
                 Assertions.assertEquals(200, resultResponse.status().code())
                 Assertions.assertEquals("OK", resultResponse.status().reasonPhrase())
                 if (withBodyHeader) {
@@ -75,7 +79,7 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
                 }
                 Assertions.assertEquals(if (withBody) ServerIncluded.responseContentLength else 0, resultResponse.content().writerIndex()) // --> released after use
             }
-            requestCaptor.firstValue.also { resultRequest ->
+            state.requests.first().also { resultRequest ->
                 Assertions.assertEquals(request.method, resultRequest.method().name())
                 Assertions.assertEquals(/*http://localhost:${client.address.port}*/"/test", resultRequest.uri().toString())
                 val resultRequestHeaders = resultRequest.headers()
@@ -86,6 +90,13 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
                     Assertions.assertEquals(request.body.get().decodeBody().size, resultRequest.content().writerIndex())
                 }
             }
+            if (request.headers.getFirst("Connection").orElse("") == "close") {
+                Assertions.assertTrue(!client.isOpen)
+            }
+
+            state.requests.clear()
+            state.responses.clear()
+
             LOGGER.debug { "TEST [${request.method}] [${index + 1}]: PASSED" }
         }
     } finally {
@@ -95,15 +106,14 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
 
 fun createClient(handler: HttpHandler, corePoolSize: Int, serverPort: Int): IChannel = Channel(
     InetSocketAddress("localhost", serverPort),
-    false,
+    Channel.Security(),
     "alias",
     1000,
     handler,
     DummyManglerFactory.DummyMangler,
-    onEvent = { _, _ -> },
+    onEvent = {},
     onMessage = { },
     Executors.newScheduledThreadPool(corePoolSize),
     NioEventLoopGroup(corePoolSize, Executors.newScheduledThreadPool(corePoolSize)),
-    TaskSequencePool(Executors.newScheduledThreadPool(corePoolSize)),
     EventID.getDefaultInstance()
 )

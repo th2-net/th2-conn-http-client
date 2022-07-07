@@ -13,7 +13,7 @@ import java.net.URI
 class RequestMethodsTests: ServerIncluded() {
 
     companion object {
-        const val `test request count`: Int = 3
+        const val `test request count`: Int = 5
     }
 
     @Test

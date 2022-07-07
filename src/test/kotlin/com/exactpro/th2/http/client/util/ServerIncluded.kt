@@ -1,11 +1,6 @@
 package com.exactpro.th2.http.client.util
 
 import com.exactpro.th2.common.grpc.EventID
-import com.exactpro.th2.conn.dirty.tcp.core.TaskSequencePool
-import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
-import com.exactpro.th2.conn.dirty.tcp.core.api.impl.Channel
-import com.exactpro.th2.conn.dirty.tcp.core.api.impl.DummyManglerFactory
-import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.server.HttpServer
 import com.exactpro.th2.http.server.Main
 import com.exactpro.th2.http.server.api.IStateManager
@@ -13,7 +8,6 @@ import com.exactpro.th2.http.server.api.IStateManagerSettings
 import com.exactpro.th2.http.server.api.impl.BasicStateManager
 import com.exactpro.th2.http.server.options.Th2ServerOptions
 import com.exactpro.th2.http.server.util.LinkedData
-import io.netty.channel.nio.NioEventLoopGroup
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import rawhttp.core.EagerHttpResponse
@@ -38,7 +32,6 @@ abstract class ServerIncluded {
 
         @JvmStatic
         protected val serverPort = 25565
-        private const val corePoolSize = 12
         private const val responseBody = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
 
         private val rawHttp = RawHttp()
