@@ -16,12 +16,14 @@ import org.junit.jupiter.api.Assertions
 import rawhttp.core.RawHttpRequest
 import java.net.InetSocketAddress
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 private val LOGGER = KotlinLogging.logger { }
 
 fun IChannel.send(request: RawHttpRequest, metadata: Map<String, String>) = this.send(Unpooled.buffer().writeBytes(request.toString().toByteArray()) , metadata, IChannel.SendMode.HANDLE)
 
 fun waitUntil(timeout: Long, step: Long = 100, check: () -> Boolean) {
+    LOGGER.info {"Start waiting for positive check"}
     var fullTime = 0L
     while (!check() && timeout > fullTime) {
         fullTime+=step
@@ -101,6 +103,37 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
         }
     } finally {
         client.close()
+    }
+}
+
+fun stressTest(times: Int, port: Int, getRequest: (Int) -> RawHttpRequest) {
+    val request = Unpooled.buffer().writeBytes(getRequest(port).toString().toByteArray())
+    val testContext = TestContext(HttpHandlerSettings())
+
+    val state = object : IState {
+        val requests = AtomicInteger(0)
+        val responses = AtomicInteger(0)
+
+        override fun onResponse(response: FullHttpResponse) {
+            responses.incrementAndGet()
+        }
+
+        override fun onRequest(request: FullHttpRequest) {
+            requests.incrementAndGet()
+        }
+    }
+
+    val client = createClient(HttpHandler(testContext, state, testContext.settings as HttpHandlerSettings), 10, port)
+    testContext.init(client)
+
+    repeat(times) {
+        client.send(request, mapOf(), IChannel.SendMode.HANDLE)
+    }
+
+    LOGGER.info { "$times requests was sent" }
+
+    waitUntil(5000) {
+        state.responses == state.requests
     }
 }
 
