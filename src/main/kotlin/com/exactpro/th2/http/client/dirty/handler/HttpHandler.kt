@@ -145,7 +145,6 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         if (isLastResponse.get() || lastMethod.get() == HttpMethod.CONNECT) {
             LOGGER.debug { "Closing channel due last request/response" }
         }
-        this.context.channel.close()
     }
 
     override fun close() {

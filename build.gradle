@@ -157,7 +157,7 @@ dependencies {
     api platform('com.exactpro.th2:bom:3.1.0')
 
     implementation 'com.exactpro.th2:common:3.37.2'
-    implementation 'com.exactpro.th2:conn-dirty-tcp-core:1.0.0-performance-refactoring-2590394807-SNAPSHOT'
+    implementation 'com.exactpro.th2:conn-dirty-tcp-core:1.0.0-performance-refactoring-2634886052-SNAPSHOT'
 
     implementation 'org.slf4j:slf4j-log4j12:1.7.32'
     implementation 'org.slf4j:slf4j-api:1.7.32'
