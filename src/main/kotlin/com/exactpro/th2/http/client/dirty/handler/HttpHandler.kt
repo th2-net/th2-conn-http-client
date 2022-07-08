@@ -50,34 +50,6 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         this.pipeline().addLast("decoder", requestDecoder).addLast("aggregator", requestAggregator).addLast("encoder", requestEncoder)
     }
 
-    override fun onIncoming(message: ByteBuf): Map<String, String> {
-        when (val mode = httpMode.get()) {
-            HttpMode.DEFAULT -> {
-                val response = httpClientChannel.readInbound<FullHttpResponse>()
-                if (response.decoderResult().isFailure) {
-                    throw response.decoderResult().cause()
-                }
-                LOGGER.debug { "Received response: $response" }
-                when {
-                    isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
-                    response.isKeepAlive() -> Unit
-                    else -> context.channel.close() // all else are closing cases
-                }
-
-                when(lastMethod.get()) {
-                    HttpMethod.CONNECT -> if (response.status().code() == 200) httpMode.set(HttpMode.CONNECT)
-                }
-
-                state.onResponse(response)
-                response.content().release()
-            }
-            HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
-            else -> error("Unsupported http mode: $mode")
-        }
-
-        return mutableMapOf()
-    }
-
     override fun onOutgoing(message: ByteBuf, metadata: MutableMap<String, String>) {
         when (val mode = httpMode.get()) {
             HttpMode.DEFAULT -> {
@@ -110,6 +82,34 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         }
     }
 
+    override fun onIncoming(message: ByteBuf): Map<String, String> {
+        when (val mode = httpMode.get()) {
+            HttpMode.DEFAULT -> {
+                val response = httpClientChannel.readInbound<FullHttpResponse>()
+                if (response.decoderResult().isFailure) {
+                    throw response.decoderResult().cause()
+                }
+                LOGGER.debug { "Received response: $response" }
+                when {
+                    isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
+                    response.isKeepAlive() -> Unit
+                    else -> context.channel.close() // all else are closing cases
+                }
+
+                when(lastMethod.get()) {
+                    HttpMethod.CONNECT -> if (response.status().code() == 200) httpMode.set(HttpMode.CONNECT)
+                }
+
+                state.onResponse(response)
+                response.content().release()
+            }
+            HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
+            else -> error("Unsupported http mode: $mode")
+        }
+
+        return mutableMapOf()
+    }
+
     override fun onReceive(buffer: ByteBuf) = if (handleResponseParts(buffer)) {
         buffer.retainedDuplicate().readerIndex(0)
     } else {
@@ -117,8 +117,9 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     private fun handleResponseParts(buffer: ByteBuf): Boolean {
+        val oldSize = httpClientChannel.inboundMessages().size
         httpClientChannel.writeInbound(buffer.readBytes(buffer.writerIndex()-buffer.readerIndex()))
-        return httpClientChannel.inboundMessages().size > 0
+        return httpClientChannel.inboundMessages().size > oldSize
     }
 
     private fun handleRequest(message: ByteBuf, handler: (FullHttpRequest) -> Unit): ByteBuf = runCatching {
