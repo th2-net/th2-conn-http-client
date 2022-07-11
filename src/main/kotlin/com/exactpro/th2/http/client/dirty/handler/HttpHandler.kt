@@ -75,6 +75,8 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
                 if (newMessage.writerIndex() != message.writerIndex()) {
                     message.clear().writeBytes(newMessage)
+                } else {
+                    message.resetReaderIndex()
                 }
             }
             HttpMode.CONNECT -> LOGGER.trace { "$mode: Sending data passing as tcp package" }
@@ -117,8 +119,14 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     private fun handleResponseParts(buffer: ByteBuf): Boolean {
+        if (LOGGER.isDebugEnabled) {
+            val oldReaderIndex = buffer.readerIndex()
+            LOGGER.debug { "Received part of data: ${buffer.toString(Charset.defaultCharset())}" }
+            buffer.readerIndex(oldReaderIndex)
+        }
         val oldSize = httpClientChannel.inboundMessages().size
         httpClientChannel.writeInbound(buffer.readBytes(buffer.writerIndex()-buffer.readerIndex()))
+        LOGGER.debug { "OnReceive oldSize: $oldSize and newSize: ${httpClientChannel.inboundMessages().size}" }
         return httpClientChannel.inboundMessages().size > oldSize
     }
 

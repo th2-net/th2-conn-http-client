@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private val LOGGER = KotlinLogging.logger { }
 
-fun IChannel.send(request: RawHttpRequest, metadata: Map<String, String>) = this.send(Unpooled.buffer().writeBytes(request.toString().toByteArray()) , metadata, IChannel.SendMode.HANDLE)
+fun IChannel.send(request: RawHttpRequest, metadata: Map<String, String>) = this.send(Unpooled.buffer().writeBytes(request.toString().toByteArray()), metadata, IChannel.SendMode.HANDLE)
 
 fun waitUntil(timeout: Long, step: Long = 100, check: () -> Boolean) {
     LOGGER.info {"Start waiting for positive check"}
@@ -107,41 +107,47 @@ fun simpleTest(port: Int, withBody: Boolean = true, withBodyHeader: Boolean = wi
 }
 
 fun stressTest(times: Int, port: Int, getRequest: (Int) -> RawHttpRequest) {
-    val request = Unpooled.buffer().writeBytes(getRequest(port).toString().toByteArray())
-    val testContext = TestContext(HttpHandlerSettings())
+    val testContext = TestContext(HttpHandlerSettings().apply {
+        this.defaultHeaders = mapOf()
+    })
 
     val state = object : IState {
         val requests = AtomicInteger(0)
         val responses = AtomicInteger(0)
-
-        override fun onResponse(response: FullHttpResponse) {
-            responses.incrementAndGet()
-        }
-
-        override fun onRequest(request: FullHttpRequest) {
-            requests.incrementAndGet()
-        }
+        override fun onResponse(response: FullHttpResponse) { responses.incrementAndGet() }
+        override fun onRequest(request: FullHttpRequest) { requests.incrementAndGet() }
     }
 
     val client = createClient(HttpHandler(testContext, state, testContext.settings as HttpHandlerSettings), 10, port)
     testContext.init(client)
 
-    repeat(times) {
-        client.send(request, mapOf(), IChannel.SendMode.HANDLE)
+    val request = getRequest(port).toString().toByteArray()
+
+    try {
+        repeat(times) {
+            if (!client.isOpen) client.open()
+            client.send(Unpooled.buffer().writeBytes(request), mapOf(), IChannel.SendMode.HANDLE)
+        }
+
+        waitUntil(10000) {
+            state.responses.get() == times
+        }
+
+        LOGGER.info { "$times requests was sent" }
+
+        Assertions.assertEquals(times, state.requests.get()) {"Requests count must be exactly: $times; Response count: ${state.responses.get()}"}
+        Assertions.assertEquals(state.requests.get(), state.responses.get()) {"Requests and response count must be same: (req) ${state.requests.get()} != ${state.responses.get()} (res)"}
+    } finally {
+        client.close()
     }
 
-    LOGGER.info { "$times requests was sent" }
-
-    waitUntil(5000) {
-        state.responses == state.requests
-    }
 }
 
-fun createClient(handler: HttpHandler, corePoolSize: Int, serverPort: Int): IChannel = Channel(
+fun createClient(handler: HttpHandler, corePoolSize: Int, serverPort: Int, autoReconnect: Boolean = false): IChannel = Channel(
     InetSocketAddress("localhost", serverPort),
     Channel.Security(),
     "alias",
-    false,
+    autoReconnect,
     5000,
     1000,
     false,
