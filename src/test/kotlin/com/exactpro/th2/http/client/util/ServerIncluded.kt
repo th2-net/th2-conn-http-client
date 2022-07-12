@@ -32,7 +32,7 @@ abstract class ServerIncluded {
 
         @JvmStatic
         protected val serverPort = 25565
-        private const val responseBody = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
+        private val responseBody = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
 
         private val rawHttp = RawHttp()
         private val stateManager: IStateManager = object: BasicStateManager() {
@@ -53,7 +53,7 @@ abstract class ServerIncluded {
         private lateinit var server: HttpServer
 
         private fun createResponse(withBody: Boolean = true, withBodyHeaders: Boolean = withBody): String {
-            return """HTTP/1.1 200 OK ${if (withBodyHeaders) "\nContent-Type: plain/text\nContent-Length:  ${if (withBody) responseContentLength else "0"}" else "\nContent-Length: 0"}${if (withBody) "\n\n$responseBody" else "\n"}""".trimIndent()
+            return """HTTP/1.1 200 OK ${if (withBodyHeaders) "\nContent-Type: plain/text\nContent-Length:  ${if (withBody) responseContentLength else "0"}" else "\nContent-Length: 0"}${if (withBody) "\n\n$responseBody" else ""}"""
         }
 
         fun RawHttp.parseResponse(response: String, linkedData: LinkedData): RawHttpResponse<LinkedData> {
@@ -71,6 +71,7 @@ abstract class ServerIncluded {
                 InvalidHttpResponse(message, lineNumber + 1)
             }
             val bodyReader: BodyReader? = if (RawHttp.responseHasBody(statusLine, requestLine)) createBodyReader(inputStream, statusLine, headers) else null
+
             return RawHttpResponse(linkedData, null, statusLine, headers, bodyReader)
         }
 

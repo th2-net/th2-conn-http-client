@@ -18,6 +18,7 @@ import io.netty.handler.codec.http.HttpRequestDecoder
 import io.netty.handler.codec.http.HttpRequestEncoder
 import mu.KotlinLogging
 import java.nio.charset.Charset
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -26,6 +27,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
     private val requestAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
+    private val responseOutputQueue = ConcurrentLinkedQueue<FullHttpResponse>()
 
     private val requestDecoder = HttpRequestDecoder().apply {
         (this as ByteToMessageDecoder).setCumulator { _, cumulation, `in` ->
@@ -87,7 +89,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     override fun onIncoming(message: ByteBuf): Map<String, String> {
         when (val mode = httpMode.get()) {
             HttpMode.DEFAULT -> {
-                val response = httpClientChannel.readInbound<FullHttpResponse>()
+                val response = responseOutputQueue.poll() as FullHttpResponse
                 if (response.decoderResult().isFailure) {
                     throw response.decoderResult().cause()
                 }
@@ -112,22 +114,22 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         return mutableMapOf()
     }
 
-    override fun onReceive(buffer: ByteBuf) = if (handleResponseParts(buffer)) {
-        buffer.retainedDuplicate().readerIndex(0)
-    } else {
-        null
+    override fun onReceive(buffer: ByteBuf): ByteBuf? {
+        if (httpMode.get() == HttpMode.CONNECT) return buffer
+        return handleResponseParts(buffer)?.let {
+            LOGGER.debug { "Message found" }
+            responseOutputQueue.offer(it)
+            buffer.retainedDuplicate().readerIndex(0)
+        }
     }
 
-    private fun handleResponseParts(buffer: ByteBuf): Boolean {
-        if (LOGGER.isDebugEnabled) {
-            val oldReaderIndex = buffer.readerIndex()
-            LOGGER.debug { "Received part of data: ${buffer.toString(Charset.defaultCharset())}" }
-            buffer.readerIndex(oldReaderIndex)
+    private fun handleResponseParts(buffer: ByteBuf): FullHttpResponse? {
+        while (buffer.isReadable && !httpClientChannel.writeInbound(buffer.retainedSliceLine() ?: error("Part is unreadable"))) {}
+        if (httpClientChannel.inboundMessages().size > 0) {
+            return httpClientChannel.inboundMessages().poll() as FullHttpResponse
         }
-        val oldSize = httpClientChannel.inboundMessages().size
-        httpClientChannel.writeInbound(buffer.readBytes(buffer.writerIndex()-buffer.readerIndex()))
-        LOGGER.debug { "OnReceive oldSize: $oldSize and newSize: ${httpClientChannel.inboundMessages().size}" }
-        return httpClientChannel.inboundMessages().size > oldSize
+
+        return null
     }
 
     private fun handleRequest(message: ByteBuf, handler: (FullHttpRequest) -> Unit): ByteBuf = runCatching {
