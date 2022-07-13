@@ -1,8 +1,25 @@
+/*
+ * Copyright 2022-2022 Exactpro (Exactpro Systems Limited)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.exactpro.th2.http.client.dirty.handler
 
 import com.exactpro.th2.conn.dirty.tcp.core.api.IContext
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
+import com.exactpro.th2.http.client.dirty.handler.codec.DirtyHttpClientCodec
 import com.exactpro.th2.http.client.dirty.handler.state.IState
 import com.google.auto.service.AutoService
 import io.netty.buffer.ByteBuf
@@ -10,7 +27,6 @@ import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.ByteToMessageDecoder
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
-import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpMessage
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
@@ -36,7 +52,13 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         }
     }
     private val requestEncoder = HttpRequestEncoder()
-    private val httpClientCodec = HttpClientCodec()
+    private val httpClientCodec = DirtyHttpClientCodec().apply {
+        getDecoder().setCumulator { _, cumulation, `in` ->
+            cumulation.release()
+            `in`
+        }
+        isSingleDecode = true
+    }
 
     private val httpMode = AtomicReference(HttpMode.DEFAULT)
     private val lastMethod = AtomicReference<HttpMethod?>(null)
@@ -105,7 +127,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                 }
 
                 state.onResponse(response)
-                response.content().release()
+                response.release()
             }
             HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
             else -> error("Unsupported http mode: $mode")
@@ -124,11 +146,16 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
 
     private fun handleResponseParts(buffer: ByteBuf): FullHttpResponse? {
-        while (buffer.isReadable && !httpClientChannel.writeInbound(buffer.retainedSliceLine() ?: error("Part is unreadable"))) {}
+        //while (buffer.isReadable && !httpClientChannel.writeInbound(buffer.retainedSliceLine() ?: error("Part is unreadable"))) {}
+        var oldReaderIndex = buffer.readerIndex()
+        while(buffer.isReadable) {
+            httpClientChannel.writeInbound(buffer.retain())
+            if (buffer.readerIndex() == oldReaderIndex || httpClientChannel.inboundMessages().size > 0) break
+            oldReaderIndex = buffer.readerIndex()
+        }
         if (httpClientChannel.inboundMessages().size > 0) {
             return httpClientChannel.inboundMessages().poll() as FullHttpResponse
         }
-
         return null
     }
 
