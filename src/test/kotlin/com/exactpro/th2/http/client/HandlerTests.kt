@@ -100,7 +100,7 @@ class HandlerTests {
 
                 buffer.clear()
                 if (byteBuf.readableBytes() > 0) {
-                    buffer.append(byteBuf.readBytes(byteBuf.readableBytes()).toString(Charset.defaultCharset()))
+                    buffer.append(byteBuf.readCharSequence(byteBuf.readableBytes(), Charset.defaultCharset()))
                 }
                 byteBuf.release()
             }

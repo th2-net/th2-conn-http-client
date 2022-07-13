@@ -19,6 +19,7 @@ package com.exactpro.th2.http.client.dirty.handler.codec
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.CombinedChannelDuplexHandler
+import io.netty.handler.codec.DecoderException
 import io.netty.handler.codec.PrematureChannelClosureException
 import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpClientUpgradeHandler
@@ -31,8 +32,10 @@ import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseDecoder
 import io.netty.handler.codec.http.LastHttpContent
 import io.netty.util.ReferenceCountUtil
+import java.lang.Exception
 import java.util.ArrayDeque
 import java.util.Queue
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -58,11 +61,13 @@ class DirtyHttpClientCodec : CombinedChannelDuplexHandler<HttpResponseDecoder, H
         this.failOnMissingResponse = failOnMissingResponse
     }
 
-    fun getDecoder() = this.inboundHandler()
-    fun getEncoder() = this.outboundHandler()
+    val decoder
+        get() = this.inboundHandler() as Decoder
+    val encoder
+        get() = this.outboundHandler() as Encoder
 
     override fun prepareUpgradeFrom(ctx: ChannelHandlerContext) {
-        (outboundHandler() as Encoder).upgraded = true
+        encoder.upgraded = true
     }
 
     override fun upgradeFrom(ctx: ChannelHandlerContext) {
@@ -76,7 +81,7 @@ class DirtyHttpClientCodec : CombinedChannelDuplexHandler<HttpResponseDecoder, H
             inboundHandler()!!.isSingleDecode = singleDecode
         }
 
-    private inner class Encoder : HttpRequestEncoder() {
+    inner class Encoder : HttpRequestEncoder() {
         var upgraded = false
 
         override fun encode(ctx: ChannelHandlerContext, msg: Any, out: MutableList<Any>) {
@@ -98,9 +103,40 @@ class DirtyHttpClientCodec : CombinedChannelDuplexHandler<HttpResponseDecoder, H
         }
     }
 
-    private inner class Decoder : HttpResponseDecoder {
+    inner class Decoder : HttpResponseDecoder {
         constructor(maxInitialLineLength: Int, maxHeaderSize: Int, maxChunkSize: Int, validateHeaders: Boolean) : super(maxInitialLineLength, maxHeaderSize, maxChunkSize, validateHeaders) {}
         constructor(maxInitialLineLength: Int, maxHeaderSize: Int, maxChunkSize: Int, validateHeaders: Boolean, initialBufferSize: Int, allowDuplicateContentLengths: Boolean, allowPartialChunks: Boolean) : super(maxInitialLineLength, maxHeaderSize, maxChunkSize, validateHeaders, initialBufferSize, allowDuplicateContentLengths, allowPartialChunks) {}
+
+        val firedChannelRead = AtomicBoolean(false)
+        override fun channelRead(ctx: ChannelHandlerContext, msg: Any) {
+            when (msg) {
+                is ByteBuf -> OutputList<Any>().let { output ->
+                    try {
+                        callDecode(ctx, msg, output)
+                        firedChannelRead.set(firedChannelRead.get() || output.modifiedScienceRecycled)
+                        output.forEach(ctx::fireChannelRead)
+                    } catch (e: DecoderException) {
+                        throw e
+                    } catch (e: Exception) {
+                        throw DecoderException(e)
+                    } finally {
+                        output.recycle()
+                        msg.release()
+                    }
+                }
+                else -> ctx.fireChannelRead(msg)
+            }
+        }
+
+
+        override fun channelReadComplete(ctx: ChannelHandlerContext) {
+            discardSomeReadBytes()
+            if (!firedChannelRead.get() && !ctx.channel().config().isAutoRead) {
+                ctx.read()
+            }
+            ctx.fireChannelReadComplete()
+        }
+
 
         override fun decode(ctx: ChannelHandlerContext, buffer: ByteBuf, out: MutableList<Any>) {
             if (done) {
@@ -164,6 +200,23 @@ class DirtyHttpClientCodec : CombinedChannelDuplexHandler<HttpResponseDecoder, H
                     ctx.fireExceptionCaught(PrematureChannelClosureException("channel gone inactive with $missingResponses missing response(s)"))
                 }
             }
+        }
+    }
+
+    class OutputList<T> : ArrayList<T>() {
+        private var modified = false
+        val modifiedScienceRecycled
+            get() = modified
+
+        override fun add(element: T): Boolean = super.add(element).also { modified = true }
+        override fun add(index: Int, element: T) = super.add(index, element).also { modified = true }
+        override fun addAll(elements: Collection<T>): Boolean = super.addAll(elements).also { modified = true }
+        override fun addAll(index: Int, elements: Collection<T>): Boolean = super.addAll(index, elements)
+            .also { modified = true }
+
+        fun recycle() {
+            super.clear()
+            modified = false
         }
     }
 

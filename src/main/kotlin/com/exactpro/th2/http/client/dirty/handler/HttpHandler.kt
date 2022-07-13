@@ -53,9 +53,9 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     }
     private val requestEncoder = HttpRequestEncoder()
     private val httpClientCodec = DirtyHttpClientCodec().apply {
-        getDecoder().setCumulator { _, cumulation, `in` ->
+        decoder.setCumulator { _, cumulation, `in` ->
             cumulation.release()
-            `in`
+            `in`.retain()
         }
         isSingleDecode = true
     }
