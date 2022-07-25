@@ -16,12 +16,12 @@
 
 package com.exactpro.th2.http.client
 
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpBody
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpHeaders
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpMethod
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.BodyPointer
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.MethodPointer
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpURL
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpVersion
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
 import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
 import com.exactpro.th2.http.client.dirty.handler.state.DefaultState
@@ -51,12 +51,12 @@ class StateTests {
         val lineParser = LineParser()
         lineParser.parse(buffer)
         val headers = headerParser.parse(buffer)
-        val container = DirtyHttpHeaders(requestString.indexOf("\n")+1, 17 + 17 + 19 + 3, Unpooled.buffer().writeBytes(requestString.toByteArray()), headers)
+        val container = HeadersPointer(requestString.indexOf("\n")+1, 17 + 17 + 19 + 3, Unpooled.buffer().writeBytes(requestString.toByteArray()), headers)
 
         val user = "test_user"
         val password = "test_password"
         val state = DefaultState(DefaultStateSettings(user, password))
-        val request = DirtyHttpRequest(DirtyHttpMethod(0, HttpMethod.GET), DirtyHttpURL(5, "/test"), DirtyHttpVersion(11, HttpVersion.HTTP_1_1), DirtyHttpBody(82, buffer), container, buffer)
+        val request = DirtyHttpRequest(MethodPointer(0, HttpMethod.GET), StringPointer(5, "/test"), VersionPointer(11, HttpVersion.HTTP_1_1), BodyPointer(82, buffer), container, buffer)
         state.onRequest(request)
         val auth = request.headers["Authorization"]
         Assertions.assertNotNull(auth)

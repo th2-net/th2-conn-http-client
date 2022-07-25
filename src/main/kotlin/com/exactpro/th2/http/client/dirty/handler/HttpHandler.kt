@@ -30,7 +30,6 @@ import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpMessage
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
-import io.netty.handler.codec.http.HttpRequestEncoder
 import mu.KotlinLogging
 import java.lang.Exception
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -42,12 +41,10 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
     private lateinit var hostValue: String
 
-    private val requestAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
     private val responseOutputQueue = ConcurrentLinkedQueue<FullHttpResponse>()
 
     private val requestDecoder = DirtyRequestDecoder()
-    private val requestEncoder = HttpRequestEncoder()
     private val httpClientCodec = DirtyHttpClientCodec().apply {
         decoder.setCumulator { _, cumulation, `in` ->
             cumulation.release()
@@ -64,10 +61,6 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     private val httpClientChannel: EmbeddedChannel = EmbeddedChannel().apply {
         this.pipeline().addLast("client", httpClientCodec).addLast("aggregator", responseAggregator)
     }
-
-//    private val requestChannel: EmbeddedChannel = EmbeddedChannel().apply {
-//        this.pipeline().addLast("decoder", requestDecoder).addLast("aggregator", requestAggregator).addLast("encoder", requestEncoder)
-//    }
 
     override fun onOutgoing(message: ByteBuf, metadata: MutableMap<String, String>) {
         try {

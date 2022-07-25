@@ -16,7 +16,7 @@
 
 package com.exactpro.th2.http.client.dirty.handler
 
-import com.exactpro.th2.http.client.dirty.handler.data.HttpHeaderPosition
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
 import io.netty.buffer.ByteBuf
 import io.netty.util.internal.AppendableCharSequence
 import java.util.ServiceLoader
@@ -53,7 +53,7 @@ fun ByteBuf.forEachByteIndexed(byteProcessor: (index: Int, byte: Byte) -> Boolea
     }
 }
 
-fun HttpHeaderPosition.move(step: Int) {
+fun HeadersPointer.HttpHeaderPosition.move(step: Int) {
     this.start += step
     this.end += step
 }

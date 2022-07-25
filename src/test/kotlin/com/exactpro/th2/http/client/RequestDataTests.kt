@@ -1,6 +1,6 @@
 package com.exactpro.th2.http.client
 
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpHeaders
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
 import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
 import io.netty.buffer.Unpooled
@@ -27,14 +27,13 @@ class RequestDataTests {
         lineParser.parse(buffer)
         val startOfHeader = buffer.readerIndex()
         val headers = headerParser.parse(buffer)
-        val container = DirtyHttpHeaders(startOfHeader, buffer.readerIndex()-startOfHeader, Unpooled.buffer()
-            .writeBytes(requestString.toByteArray()), headers)
+        val resultHeaders = HeadersPointer(startOfHeader, buffer.readerIndex()-startOfHeader, buffer, headers)
 
-        Assertions.assertEquals("Something", container["Accept"])
-        Assertions.assertEquals("close", container["Connection"])
-        Assertions.assertEquals("w3schools.com", container["Host"])
+        Assertions.assertEquals("Something", resultHeaders["Accept"])
+        Assertions.assertEquals("close", resultHeaders["Connection"])
+        Assertions.assertEquals("w3schools.com", resultHeaders["Host"])
 
-        container.remove("Accept")
+        resultHeaders.remove("Accept")
 
         Assertions.assertEquals("""
             POST /test/demo_form.php HTTP/1.1
@@ -42,17 +41,17 @@ class RequestDataTests {
             Host: w3schools.com
             
             name1=value1&name2=value2
-        """.trimIndent(), container.value.readerIndex(0).toString(Charset.defaultCharset()))
+        """.trimIndent(), buffer.readerIndex(0).toString(Charset.defaultCharset()))
 
-        Assertions.assertEquals(null, container["Accept"])
-        Assertions.assertEquals("close", container["Connection"])
-        Assertions.assertEquals("w3schools.com", container["Host"])
+        Assertions.assertEquals(null, resultHeaders["Accept"])
+        Assertions.assertEquals("close", resultHeaders["Connection"])
+        Assertions.assertEquals("w3schools.com", resultHeaders["Host"])
 
-        container["Accept"] = "Something"
+        resultHeaders["Accept"] = "Something"
 
-        Assertions.assertEquals("Something", container["Accept"])
-        Assertions.assertEquals("close", container["Connection"])
-        Assertions.assertEquals("w3schools.com", container["Host"])
+        Assertions.assertEquals("Something", resultHeaders["Accept"])
+        Assertions.assertEquals("close", resultHeaders["Connection"])
+        Assertions.assertEquals("w3schools.com", resultHeaders["Host"])
 
         Assertions.assertEquals("""
             POST /test/demo_form.php HTTP/1.1
@@ -61,14 +60,14 @@ class RequestDataTests {
             Accept: Something
             
             name1=value1&name2=value2
-        """.trimIndent(), container.value.readerIndex(0).toString(Charset.defaultCharset()).replace("\r", ""))
+        """.trimIndent(), buffer.readerIndex(0).toString(Charset.defaultCharset()).replace("\r", ""))
 
-        container["Test"] = "value"
+        resultHeaders["Test"] = "value"
 
-        Assertions.assertEquals("Something", container["Accept"])
-        Assertions.assertEquals("value", container["Test"])
-        Assertions.assertEquals("close", container["Connection"])
-        Assertions.assertEquals("w3schools.com", container["Host"])
+        Assertions.assertEquals("Something", resultHeaders["Accept"])
+        Assertions.assertEquals("value", resultHeaders["Test"])
+        Assertions.assertEquals("close", resultHeaders["Connection"])
+        Assertions.assertEquals("w3schools.com", resultHeaders["Host"])
 
         Assertions.assertEquals("""
             POST /test/demo_form.php HTTP/1.1
@@ -78,6 +77,6 @@ class RequestDataTests {
             Test: value
             
             name1=value1&name2=value2
-        """.trimIndent(), container.value.readerIndex(0).toString(Charset.defaultCharset()).replace("\r", ""))
+        """.trimIndent(), buffer.readerIndex(0).toString(Charset.defaultCharset()).replace("\r", ""))
     }
 }
