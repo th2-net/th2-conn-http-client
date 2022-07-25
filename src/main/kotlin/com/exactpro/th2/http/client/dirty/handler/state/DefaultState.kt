@@ -16,16 +16,16 @@
 
 package com.exactpro.th2.http.client.dirty.handler.state
 
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import com.google.auto.service.AutoService
-import io.netty.handler.codec.http.FullHttpRequest
 import java.util.Base64
 import kotlin.text.Charsets.UTF_8
 
 @AutoService(DefaultStateSettings::class)
 class DefaultState(private val settings: DefaultStateSettings?) : IState {
     private val authHeader = settings?.run { "Basic ${Base64.getEncoder().encodeToString("${username}:${password}".toByteArray(UTF_8))}" } ?: ""
-    override fun onRequest(request: FullHttpRequest) {
-        if (settings != null) request.headers()["Authorization"] = authHeader
+    override fun onRequest(request: DirtyHttpRequest) {
+        if (settings != null) request.headers["Authorization"] = authHeader
     }
 }
 

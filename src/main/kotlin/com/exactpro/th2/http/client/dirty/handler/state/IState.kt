@@ -16,12 +16,12 @@
 
 package com.exactpro.th2.http.client.dirty.handler.state
 
-import io.netty.handler.codec.http.FullHttpRequest
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
 
 interface IState: AutoCloseable {
     fun onOpen() = Unit
-    fun onRequest(request: FullHttpRequest) = Unit
+    fun onRequest(request: DirtyHttpRequest) = Unit
     fun onResponse(response: FullHttpResponse) = Unit
     fun onClose() = Unit
     override fun close() = Unit

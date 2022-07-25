@@ -32,6 +32,8 @@ class HttpHandlerSettings: IProtocolHandlerSettings {
 
     @JsonDeserialize(using = StateSettingsDeserializer::class)
     var stateSettings: IStateSettings? = null
+
+    var validation = false
 }
 
 class StateSettingsDeserializer<T : IStateSettings>() : JsonDeserializer<T>() {

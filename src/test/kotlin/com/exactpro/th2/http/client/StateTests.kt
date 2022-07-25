@@ -16,9 +16,17 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpBody
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpHeaders
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpMethod
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpURL
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpVersion
+import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
+import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
 import com.exactpro.th2.http.client.dirty.handler.state.DefaultState
 import com.exactpro.th2.http.client.dirty.handler.state.DefaultStateSettings
-import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpVersion
 import org.junit.jupiter.api.Assertions
@@ -29,19 +37,34 @@ class StateTests {
 
     @Test
     fun `default authHeader test`() {
+        val requestString = """
+            GET /test HTTP/1.1${"\r"}
+            Accept: Something${"\r"}
+            Connection: close${"\r"}
+            Host: w3schools.com${"\r"}
+            
+            name1=value1&name2=value2
+        """.trimIndent()
+        val buffer = Unpooled.buffer().writeBytes(requestString.toByteArray())
+
+        val headerParser = HeaderParser()
+        val lineParser = LineParser()
+        lineParser.parse(buffer)
+        val headers = headerParser.parse(buffer)
+        val container = DirtyHttpHeaders(requestString.indexOf("\n")+1, 17 + 17 + 19 + 3, Unpooled.buffer().writeBytes(requestString.toByteArray()), headers)
+
         val user = "test_user"
         val password = "test_password"
         val state = DefaultState(DefaultStateSettings(user, password))
-        val request = DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test")
+        val request = DirtyHttpRequest(DirtyHttpMethod(0, HttpMethod.GET), DirtyHttpURL(5, "/test"), DirtyHttpVersion(11, HttpVersion.HTTP_1_1), DirtyHttpBody(82, buffer), container, buffer)
         state.onRequest(request)
-        request.headers().let { headers ->
-            Assertions.assertTrue(headers.contains("Authorization"))
-            Base64.getDecoder().decode(headers["Authorization"].removePrefix("Basic ")).let { userAndPass ->
-                val parts = userAndPass.decodeToString().split(":")
-                Assertions.assertEquals(2, parts.size)
-                Assertions.assertEquals(user, parts[0])
-                Assertions.assertEquals(password, parts[1])
-            }
+        val auth = request.headers["Authorization"]
+        Assertions.assertNotNull(auth)
+        Base64.getDecoder().decode(auth!!.removePrefix("Basic ")).let { userAndPass ->
+            val parts = userAndPass.decodeToString().split(":")
+            Assertions.assertEquals(2, parts.size)
+            Assertions.assertEquals(user, parts[0])
+            Assertions.assertEquals(password, parts[1])
         }
 
     }

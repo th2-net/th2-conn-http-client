@@ -19,15 +19,12 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.client.dirty.handler.HttpHandlerSettings
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import com.exactpro.th2.http.client.dirty.handler.state.IState
-import com.exactpro.th2.http.client.util.ServerIncluded
 import com.exactpro.th2.http.client.util.TestContext
 import com.exactpro.th2.http.client.util.createClient
-import com.exactpro.th2.http.client.util.stressTest
 import io.netty.buffer.Unpooled
-import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
-import org.junit.jupiter.api.Test
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
@@ -54,7 +51,7 @@ class ProfilerTests {
                 responses.incrementAndGet()
             }
 
-            override fun onRequest(request: FullHttpRequest) {
+            override fun onRequest(request: DirtyHttpRequest) {
                 requests.incrementAndGet()
             }
         }
