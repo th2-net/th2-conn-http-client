@@ -25,8 +25,11 @@ class RequestDataTests {
         val headerParser = HeaderParser()
         val lineParser = LineParser()
         lineParser.parse(buffer)
+        lineParser.reset()
         val startOfHeader = buffer.readerIndex()
-        val headers = headerParser.parse(buffer)
+        check(headerParser.parse(buffer))
+        val headers = headerParser.getHeaders()
+        headerParser.reset()
         val resultHeaders = HeadersPointer(startOfHeader, buffer.readerIndex()-startOfHeader, buffer, headers)
 
         Assertions.assertEquals("Something", resultHeaders["Accept"])

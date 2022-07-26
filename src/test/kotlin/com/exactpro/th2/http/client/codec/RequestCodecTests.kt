@@ -28,24 +28,13 @@ class RequestCodecTests {
 
     @Test
     fun `Request decode without body`() {
-        var requestString = """
+        val requestString = """
             POST /test/demo_form.php HTTP/1.1
             Host: w3schools.com
             
             """.trimIndent()
         val codec = DirtyRequestDecoder()
-        var decodeResult = codec.decodeSingle(Unpooled.buffer().writeBytes(requestString.toByteArray()))
-        Assertions.assertNotNull(decodeResult)
-        Assertions.assertEquals("POST", decodeResult!!.method.name())
-        Assertions.assertEquals("/test/demo_form.php", decodeResult.url)
-        Assertions.assertEquals("HTTP/1.1", decodeResult.version.text())
-        Assertions.assertEquals("w3schools.com", decodeResult.headers["Host"])
-        Assertions.assertEquals("", decodeResult.body.toString(Charset.defaultCharset()))
-
-        requestString = """
-            POST /test/demo_form.php HTTP/1.1
-            Host: w3schools.com""".trimIndent()
-        decodeResult = codec.decodeSingle(Unpooled.buffer().writeBytes(requestString.toByteArray()))
+        val decodeResult = codec.decodeSingle(Unpooled.buffer().writeBytes(requestString.toByteArray()))
         Assertions.assertNotNull(decodeResult)
         Assertions.assertEquals("POST", decodeResult!!.method.name())
         Assertions.assertEquals("/test/demo_form.php", decodeResult.url)

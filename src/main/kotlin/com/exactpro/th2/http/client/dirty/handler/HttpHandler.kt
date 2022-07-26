@@ -22,7 +22,7 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.codec.DirtyHttpClientCodec
 import com.exactpro.th2.http.client.dirty.handler.codec.DirtyRequestDecoder
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
-import com.exactpro.th2.http.client.dirty.handler.state.IState
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IState
 import com.google.auto.service.AutoService
 import io.netty.buffer.ByteBuf
 import io.netty.channel.embedded.EmbeddedChannel

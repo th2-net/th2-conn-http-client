@@ -23,15 +23,22 @@ import io.netty.handler.codec.http.HttpConstants
 import io.netty.util.internal.AppendableCharSequence
 
 class HeaderParser {
-    fun parse(buffer: ByteBuf): MutableMap<String, HttpHeaderPosition> = mutableMapOf<String, HttpHeaderPosition>().apply {
-        reset()
+    private var endOfHeaders = false
+    private val result = mutableMapOf<String, HttpHeaderPosition>()
+
+    fun getHeaders() = result.toMutableMap()
+
+    fun parse(buffer: ByteBuf): Boolean {
         while (true) {
             val startIndex = buffer.readerIndex()
+            buffer.markReaderIndex()
             val name = parseLine(buffer)
-            if (name.isEmpty()) break
+            if(name.isEmpty()||endOfHeaders) break
             val endIndex = buffer.readerIndex()
-            this[name] = HttpHeaderPosition(startIndex, endIndex)
+            result[name] = HttpHeaderPosition(startIndex, endIndex)
         }
+        if (!endOfHeaders) buffer.resetReaderIndex()
+        return endOfHeaders
     }
 
     private fun parseLine(byteBuf: ByteBuf): String {
@@ -54,15 +61,20 @@ class HeaderParser {
                 }
             }
         }
+        if (name.isNotEmpty() && name.charAtUnsafe(name.length - 1).code.toByte() == HttpConstants.CR) {
+            name.setLength(name.length - 1)
+        }
         if (!valueStarted) {
+            if (name.isEmpty()) endOfHeaders = true
             return ""
         }
-        if (i<0) byteBuf.readerIndex(byteBuf.writerIndex()) else byteBuf.readerIndex(i + 1)
+        if (i>0) byteBuf.readerIndex(i + 1)
         return name.toString()
     }
 
-    private fun reset() {
-
+    fun reset() {
+        result.clear()
+        endOfHeaders = false
     }
 
     companion object {

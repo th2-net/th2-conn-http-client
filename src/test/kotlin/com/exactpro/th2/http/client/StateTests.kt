@@ -24,8 +24,8 @@ import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
 import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
-import com.exactpro.th2.http.client.dirty.handler.state.DefaultState
-import com.exactpro.th2.http.client.dirty.handler.state.DefaultStateSettings
+import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultState
+import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultStateSettings
 import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpVersion
@@ -49,8 +49,9 @@ class StateTests {
 
         val headerParser = HeaderParser()
         val lineParser = LineParser()
-        lineParser.parse(buffer)
-        val headers = headerParser.parse(buffer)
+        check(lineParser.parse(buffer))
+        check(headerParser.parse(buffer))
+        val headers = headerParser.getHeaders()
         val container = HeadersPointer(requestString.indexOf("\n")+1, 17 + 17 + 19 + 3, Unpooled.buffer().writeBytes(requestString.toByteArray()), headers)
 
         val user = "test_user"

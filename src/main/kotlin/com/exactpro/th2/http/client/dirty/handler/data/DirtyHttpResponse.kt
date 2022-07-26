@@ -17,6 +17,7 @@
 
 package com.exactpro.th2.http.client.dirty.handler.data
 
+import com.exactpro.th2.conn.dirty.tcp.core.util.replace
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.BodyPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
@@ -24,6 +25,43 @@ import com.exactpro.th2.http.client.dirty.handler.data.pointers.IntPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
 import io.netty.buffer.ByteBuf
 
-class DirtyHttpResponse(private val httpVersion: VersionPointer, private val code: IntPointer, private val reason: StringPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf): DirtyHttpMessage(headers, httpBody, reference) {
+class DirtyHttpResponse(private val httpVersion: VersionPointer, private val httpCode: IntPointer, private val httpReason: StringPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf): DirtyHttpMessage(headers, httpBody, reference) {
 
+    var version: NettyHttpVersion
+        get() = httpVersion.value
+        set(value) = this.httpVersion.let {
+            reference.replace(it.position, reference.writerIndex(), value.text())
+            it.value = value
+            settle()
+        }
+
+    var code: Int
+        get() = httpCode.value
+        set(value) = this.httpCode.let {
+            reference.replace(it.position, reference.writerIndex(), value.toString())
+            it.value = value
+            settle()
+        }
+
+    var reason: String
+        get() = httpReason.value
+        set(value) = this.httpReason.let {
+            reference.replace(it.position, reference.writerIndex(), value)
+            it.value = value
+            settle()
+        }
+
+    override fun settle(startSum: Int): Int {
+        var sum = startSum
+        if (httpVersion.isModified() || sum > 0) {
+            sum = httpVersion.settleSingle(sum)
+        }
+        if (httpCode.isModified() || sum > 0) {
+            sum = httpVersion.settleSingle(sum)
+        }
+        if (httpReason.isModified() || sum > 0) {
+            sum = httpVersion.settleSingle(sum)
+        }
+        return super.settle(sum)
+    }
 }

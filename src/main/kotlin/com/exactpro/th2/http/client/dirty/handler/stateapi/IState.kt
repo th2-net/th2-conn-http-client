@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.exactpro.th2.http.client.dirty.handler.state
+package com.exactpro.th2.http.client.dirty.handler.stateapi
 
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse

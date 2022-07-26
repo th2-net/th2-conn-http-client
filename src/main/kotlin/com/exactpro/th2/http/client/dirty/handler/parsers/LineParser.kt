@@ -27,14 +27,21 @@ class LineParser {
     private val parts = mutableListOf<Pair<String, Int>>()
     private var startOfElement = 0
 
-    fun parse(buffer: ByteBuf): List<Pair<String, Int>> {
-        reset()
+    val lineParts
+        get() = parts.toList()
+
+    fun parse(buffer: ByteBuf): Boolean {
+        buffer.markReaderIndex()
         val index = buffer.forEachByteIndexed(this::process)
-        if (index > 0 && buffer.isReadable) buffer.readerIndex(index+1)
-        return parts.toList()
+        if (index > 0 && buffer.isReadable) {
+            buffer.readerIndex(index+1)
+        } else {
+            buffer.resetReaderIndex()
+        }
+        return index > 0
     }
 
-    private fun reset() {
+    fun reset() {
         builder.reset()
         parts.clear()
         startOfElement = 0

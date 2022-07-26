@@ -20,6 +20,20 @@ class ParserTests {
     }
 
     @Test
+    fun `Response status parser test`() {
+        val firstLine = "HTTP1.1 200 OK WRONG DATA"
+        val additional = "HEADER_NAME: HEADER_VALUE"
+        val parser = LineParser()
+        repeat(2) {
+            parser.test(firstLine, additional)
+        }
+
+        val buffer = Unpooled.buffer().writeBytes(firstLine.toByteArray())
+        Assertions.assertFalse(parser.parse(buffer))
+        Assertions.assertEquals(0, buffer.readerIndex())
+    }
+
+    @Test
     fun `Header parser test`() {
         val mainPart = mapOf(
             "HEADER_NAME0" to "HEADER_VALUE0",
@@ -31,6 +45,29 @@ class ParserTests {
         repeat(2) {
             parser.test(mainPart, body)
         }
+
+        var stringHeaders = """
+            HEADER_NAME0: HEADER_VALUE0
+            HEADER_NAME1: HEADER_VALUE1
+            HEADER_NAME2
+        """.trimIndent()
+        var buffer = Unpooled.buffer().writeBytes(stringHeaders.toByteArray())
+
+        Assertions.assertFalse(parser.parse(buffer))
+        buffer.release()
+        stringHeaders = """
+            HEADER_NAME2: HEADER_VALUE2
+            
+        """.trimIndent()
+        buffer = Unpooled.buffer().writeBytes(stringHeaders.toByteArray())
+        Assertions.assertTrue(parser.parse(buffer))
+
+        parser.getHeaders().let {
+            Assertions.assertEquals(3, it.size)
+            Assertions.assertTrue(it.contains("HEADER_NAME0"))
+            Assertions.assertTrue(it.contains("HEADER_NAME1"))
+            Assertions.assertTrue(it.contains("HEADER_NAME2"))
+        }
     }
 
     private fun HeaderParser.test(headers: Map<String, String>, body: String) {
@@ -38,7 +75,11 @@ class ParserTests {
         val headersString = headers.toList().joinToString(separator) {"${it.first}: ${it.second}"}
         val data = "$headersString$separator$separator$body"
         val buffer = Unpooled.buffer().writeBytes(data.toByteArray())
-        val headersPositions = parse(buffer)
+        check(parse(buffer)) {"Headers must have empty line"}
+
+        val headersPositions = getHeaders()
+        this.reset()
+
         headers.forEach {
             Assertions.assertTrue(headersPositions.contains(it.key))
             Assertions.assertTrue(headersPositions[it.key]!!.let { position -> position.end-position.start == "${it.key}: ${it.value}".length + separator.length })
@@ -48,12 +89,14 @@ class ParserTests {
     private fun LineParser.test(statusLine: String, additional: String) {
         val separator = "\r\n"
         val buffer = Unpooled.buffer().writeBytes("$statusLine$separator$additional".toByteArray())
-        val parts = parse(buffer)
+        check(parse(buffer)) {"Must found end of the line"}
+        val result = lineParts
+        reset()
         statusLine.split(" ").let {
-            Assertions.assertEquals(it.size, parts.size)
+            Assertions.assertEquals(it.size, result.size)
             it.forEachIndexed { index, value ->
-                Assertions.assertEquals(value, parts[index].first) { "$index element: $value" }
-                Assertions.assertEquals(statusLine.indexOf(value), parts[index].second)
+                Assertions.assertEquals(value, result[index].first) { "$index element: $value" }
+                Assertions.assertEquals(statusLine.indexOf(value), result[index].second)
             }
         }
 

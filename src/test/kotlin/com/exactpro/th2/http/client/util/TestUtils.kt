@@ -23,7 +23,7 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.impl.DummyManglerFactory
 import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.client.dirty.handler.HttpHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
-import com.exactpro.th2.http.client.dirty.handler.state.IState
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IState
 import io.netty.buffer.Unpooled
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.handler.codec.http.FullHttpResponse

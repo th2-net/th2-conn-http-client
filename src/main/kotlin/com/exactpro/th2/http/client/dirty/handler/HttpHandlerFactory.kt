@@ -19,8 +19,8 @@ package com.exactpro.th2.http.client.dirty.handler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IContext
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerFactory
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
-import com.exactpro.th2.http.client.dirty.handler.state.DefaultStateFactory
-import com.exactpro.th2.http.client.dirty.handler.state.IStateFactory
+import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultStateFactory
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IStateFactory
 import com.google.auto.service.AutoService
 import mu.KotlinLogging
 

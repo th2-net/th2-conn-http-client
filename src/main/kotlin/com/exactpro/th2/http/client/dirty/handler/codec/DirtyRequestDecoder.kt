@@ -35,9 +35,13 @@ class DirtyRequestDecoder {
     private val headerParser: HeaderParser = HeaderParser()
 
     fun decodeSingle(buffer: ByteBuf): DirtyHttpRequest? {
-        val startLine = startLineParser.parse(buffer)
+        check(startLineParser.parse(buffer)) {"Request must contain Line Feed"}
+        val startLine = startLineParser.lineParts
+        startLineParser.reset()
         val startOfHeaders = buffer.readerIndex()
-        val headers = headerParser.parse(buffer)
+        check(headerParser.parse(buffer)) {"Request must contain Line Feed"}
+        val headers = headerParser.getHeaders()
+        headerParser.reset()
         val endOfHeaders = buffer.readerIndex()
         val body = BodyPointer(buffer.readerIndex(), buffer)
 

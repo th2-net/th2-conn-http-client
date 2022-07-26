@@ -20,7 +20,7 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.client.dirty.handler.HttpHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
-import com.exactpro.th2.http.client.dirty.handler.state.IState
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IState
 import com.exactpro.th2.http.client.util.TestContext
 import com.exactpro.th2.http.client.util.createClient
 import io.netty.buffer.Unpooled

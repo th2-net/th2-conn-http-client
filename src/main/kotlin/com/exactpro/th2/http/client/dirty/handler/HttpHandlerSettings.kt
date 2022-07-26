@@ -17,9 +17,9 @@
 package com.exactpro.th2.http.client.dirty.handler
 
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
-import com.exactpro.th2.http.client.dirty.handler.state.DefaultStateFactory
-import com.exactpro.th2.http.client.dirty.handler.state.IStateFactory
-import com.exactpro.th2.http.client.dirty.handler.state.IStateSettings
+import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultStateFactory
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IStateFactory
+import com.exactpro.th2.http.client.dirty.handler.stateapi.IStateSettings
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.JsonDeserializer
