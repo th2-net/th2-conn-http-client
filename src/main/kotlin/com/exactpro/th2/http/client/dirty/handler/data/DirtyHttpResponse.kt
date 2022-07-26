@@ -24,8 +24,10 @@ import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.IntPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
 import io.netty.buffer.ByteBuf
+import io.netty.handler.codec.DecoderResult
+import io.netty.handler.codec.http.HttpVersion
 
-class DirtyHttpResponse(private val httpVersion: VersionPointer, private val httpCode: IntPointer, private val httpReason: StringPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf): DirtyHttpMessage(headers, httpBody, reference) {
+class DirtyHttpResponse(private val httpVersion: VersionPointer, private val httpCode: IntPointer, private val httpReason: StringPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf, val decoderResult: DecoderResult = DecoderResult.SUCCESS): DirtyHttpMessage(headers, httpBody, reference) {
 
     var version: NettyHttpVersion
         get() = httpVersion.value
@@ -64,4 +66,47 @@ class DirtyHttpResponse(private val httpVersion: VersionPointer, private val htt
         }
         return super.settle(sum)
     }
+
+    class Builder {
+        var version: VersionPointer? = null
+            private set
+        var code: IntPointer? = null
+            private set
+        var reason: StringPointer? = null
+            private set
+        var headers: HeadersPointer? = null
+            private set
+        var body: BodyPointer? = null
+            private set
+        var reference: ByteBuf? = null
+            private set
+
+        fun setVersion(version: VersionPointer) {
+            this.version = version
+        }
+
+        fun setCode(code: IntPointer) {
+            this.code = code
+        }
+
+        fun setReason(reason: StringPointer) {
+            this.reason = reason
+        }
+
+        fun setHeaders(headers: HeadersPointer) {
+            this.headers = headers
+        }
+
+        fun setBody(body: BodyPointer) {
+            this.body = body
+        }
+
+        fun setReference(reference: ByteBuf) {
+            this.reference = reference
+        }
+
+        fun build(): DirtyHttpResponse = DirtyHttpResponse(checkNotNull(version),checkNotNull(code),checkNotNull(reason),checkNotNull(body),checkNotNull(headers),checkNotNull(reference))
+    }
+
 }
+
