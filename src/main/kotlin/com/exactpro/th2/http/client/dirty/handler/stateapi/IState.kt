@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.http.client.dirty.handler.stateapi
 
+import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
 
@@ -46,5 +47,5 @@ interface IStateFactory {
      * @param settings entity settings
      * @return entity instance
      */
-    fun create(settings: IStateSettings?): IState
+    fun create(settings: IStateSettings?, channel: IChannel): IState
 }

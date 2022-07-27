@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.http.client.dirty.handler.stateapi
 
+import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import com.google.auto.service.AutoService
 import java.util.Base64
@@ -38,5 +39,5 @@ class DefaultStateFactory : IStateFactory {
         get() = DefaultStateFactory::class.java.simpleName
     override val settings: Class<DefaultStateSettings>
         get() = DefaultStateSettings::class.java
-    override fun create(settings: IStateSettings?): IState = DefaultState(settings as? DefaultStateSettings)
+    override fun create(settings: IStateSettings?, channel: IChannel): IState = DefaultState(settings as? DefaultStateSettings)
 }

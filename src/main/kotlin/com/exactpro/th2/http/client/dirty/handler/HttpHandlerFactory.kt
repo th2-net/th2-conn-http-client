@@ -36,7 +36,7 @@ class HttpHandlerFactory: IProtocolHandlerFactory {
     override val settings: Class<out IProtocolHandlerSettings> = HttpHandlerSettings::class.java
 
     override fun create(context: IContext<IProtocolHandlerSettings>): HttpHandler = (context.settings as HttpHandlerSettings).let { settings ->
-        HttpHandler(context, stateFactory.create(settings.stateSettings), settings)
+        HttpHandler(context, stateFactory.create(settings.stateSettings, context.channel), settings)
     }
 
 
