@@ -17,64 +17,67 @@
 
 package com.exactpro.th2.http.client.dirty.handler.parsers
 
-import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer.HttpHeaderPosition
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer.HttpHeaderDetails
 import io.netty.buffer.ByteBuf
 import io.netty.handler.codec.http.HttpConstants
 import io.netty.util.internal.AppendableCharSequence
 
-class HeaderParser {
-    private var endOfHeaders = false
-    private val result = mutableMapOf<String, HttpHeaderPosition>()
+class HeaderParser: LineParser {
+    private var valueStarted = false
+    private var startOfHeadersIndex: Int? = null
+    private val nameBuilder = AppendableCharSequence(DEFAULT_INITIAL_BUFFER_SIZE)
+    private val valueBuilder = AppendableCharSequence(DEFAULT_INITIAL_BUFFER_SIZE)
+    private val result = mutableMapOf<String, HttpHeaderDetails>()
 
     fun getHeaders() = result.toMutableMap()
 
-    fun parse(buffer: ByteBuf): Boolean {
+    fun parseHeaders(buffer: ByteBuf): Boolean {
+        if (startOfHeadersIndex == null) startOfHeadersIndex = buffer.readerIndex()
         while (true) {
+            valueStarted = false
             val startIndex = buffer.readerIndex()
-            buffer.markReaderIndex()
-            val name = parseLine(buffer)
-            if(name.isEmpty()||endOfHeaders) break
-            val endIndex = buffer.readerIndex()
-            result[name] = HttpHeaderPosition(startIndex, endIndex)
+            if (!parseLine(buffer)) {
+                resetBuilders()
+                break
+            }
+
+            nameBuilder.removeCR()
+            if(nameBuilder.isEmpty()) {
+                buffer.resetReaderIndex()
+                return true
+            }
+            valueBuilder.removeCR()
+
+            result[nameBuilder.toString()] = HttpHeaderDetails(startIndex, buffer.readerIndex(), valueBuilder.toString())
+            resetBuilders()
         }
-        if (!endOfHeaders) buffer.resetReaderIndex()
-        return endOfHeaders
+        return false
     }
 
-    private fun parseLine(byteBuf: ByteBuf): String {
-        var valueStarted = false
-        val name = AppendableCharSequence(DEFAULT_INITIAL_BUFFER_SIZE)
-        val i = byteBuf.forEachByte {
-            when {
-                it == HttpConstants.LF -> {
-                    false
-                }
-                valueStarted -> true
-                it == HttpConstants.SP -> true
-                it == HttpConstants.COLON -> {
-                    valueStarted = true
-                    true
-                }
-                else -> {
-                    name.append((it.toInt() and 0xFF).toChar())
-                    true
-                }
+    override fun parse(byte: Byte, index: Int) {
+        when {
+            byte == HttpConstants.COLON -> {
+                valueStarted = true
             }
+            byte == HttpConstants.SP && valueBuilder.isEmpty() -> Unit
+            valueStarted -> valueBuilder.append((byte.toInt() and 0xFF).toChar())
+            else -> nameBuilder.append((byte.toInt() and 0xFF).toChar())
         }
-        if (name.isNotEmpty() && name.charAtUnsafe(name.length - 1).code.toByte() == HttpConstants.CR) {
-            name.setLength(name.length - 1)
-        }
-        if (!valueStarted) {
-            if (name.isEmpty()) endOfHeaders = true
-            return ""
-        }
-        if (i>0) byteBuf.readerIndex(i + 1)
-        return name.toString()
     }
 
     fun reset() {
         result.clear()
-        endOfHeaders = false
+        startOfHeadersIndex = null
+        resetBuilders()
+    }
+
+    private fun resetBuilders() {
+        nameBuilder.reset()
+        valueBuilder.reset()
+    }
+
+    private fun AppendableCharSequence.removeCR() {
+        if (this.isNotEmpty() && this.charAtUnsafe(this.length - 1).code.toByte() == HttpConstants.CR) this.setLength(this.length - 1)
     }
 
     companion object {

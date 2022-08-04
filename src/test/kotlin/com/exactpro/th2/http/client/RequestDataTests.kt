@@ -2,7 +2,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
-import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
+import com.exactpro.th2.http.client.dirty.handler.parsers.StartLineParser
 import io.netty.buffer.Unpooled
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -23,11 +23,11 @@ class RequestDataTests {
         val buffer = Unpooled.buffer().writeBytes(requestString.toByteArray())
 
         val headerParser = HeaderParser()
-        val lineParser = LineParser()
-        lineParser.parse(buffer)
+        val lineParser = StartLineParser()
+        lineParser.parseLine(buffer)
         lineParser.reset()
         val startOfHeader = buffer.readerIndex()
-        check(headerParser.parse(buffer))
+        check(headerParser.parseHeaders(buffer))
         val headers = headerParser.getHeaders()
         headerParser.reset()
         val resultHeaders = HeadersPointer(startOfHeader, buffer.readerIndex()-startOfHeader, buffer, headers)

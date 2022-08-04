@@ -20,16 +20,13 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.IContext
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandler
 import com.exactpro.th2.conn.dirty.tcp.core.api.IProtocolHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.codec.DirtyHttpClientCodec
-import com.exactpro.th2.http.client.dirty.handler.codec.DirtyRequestDecoder
-import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpMessage
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpResponse
 import com.exactpro.th2.http.client.dirty.handler.stateapi.IState
 import com.google.auto.service.AutoService
 import io.netty.buffer.ByteBuf
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.handler.codec.http.FullHttpResponse
-import io.netty.handler.codec.http.HttpMessage
+import io.netty.handler.codec.DirtyRequestDecoder
 import io.netty.handler.codec.http.HttpMethod
-import io.netty.handler.codec.http.HttpObjectAggregator
 import mu.KotlinLogging
 import java.lang.Exception
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -38,29 +35,17 @@ import java.util.concurrent.atomic.AtomicReference
 
 @AutoService(IProtocolHandler::class)
 open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, private val state: IState, private val settings: HttpHandlerSettings): IProtocolHandler {
-
     private lateinit var hostValue: String
 
-    private val responseAggregator = HttpObjectAggregator(DEFAULT_MAX_LENGTH_AGGREGATOR)
-    private val responseOutputQueue = ConcurrentLinkedQueue<FullHttpResponse>()
+    private val responseOutputQueue = ConcurrentLinkedQueue<DirtyHttpResponse>()
 
     private val requestDecoder = DirtyRequestDecoder()
-    private val httpClientCodec = DirtyHttpClientCodec().apply {
-        decoder.setCumulator { _, cumulation, `in` ->
-            cumulation.release()
-            `in`.retain()
-        }
-        isSingleDecode = true
-    }
+    private val httpClientCodec = DirtyHttpClientCodec()
 
     private val httpMode = AtomicReference(HttpMode.DEFAULT)
     private val lastMethod = AtomicReference<HttpMethod?>(null)
 
     private var isLastResponse = AtomicBoolean(false)
-
-    private val httpClientChannel: EmbeddedChannel = EmbeddedChannel().apply {
-        this.pipeline().addLast("client", httpClientCodec).addLast("aggregator", responseAggregator)
-    }
 
     override fun onOutgoing(message: ByteBuf, metadata: MutableMap<String, String>) {
         try {
@@ -94,23 +79,22 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     override fun onIncoming(message: ByteBuf): Map<String, String> {
         when (val mode = httpMode.get()) {
             HttpMode.DEFAULT -> {
-                val response = responseOutputQueue.poll() as FullHttpResponse
-                if (response.decoderResult().isFailure) {
-                    throw response.decoderResult().cause()
+                val response = responseOutputQueue.poll() as DirtyHttpResponse
+                if (response.decoderResult.isFailure) {
+                    throw response.decoderResult.cause()
                 }
                 LOGGER.debug { "Received response: $response" }
                 when {
-                    isLastResponse.get() || response.status().code() >= 400 -> context.channel.close()
+                    isLastResponse.get() || response.code >= 400 -> context.channel.close()
                     response.isKeepAlive() -> Unit
                     else -> context.channel.close() // all else are closing cases
                 }
 
                 when(lastMethod.get()) {
-                    HttpMethod.CONNECT -> if (response.status().code() == 200) httpMode.set(HttpMode.CONNECT)
+                    HttpMethod.CONNECT -> if (response.code == 200) httpMode.set(HttpMode.CONNECT)
                 }
 
                 state.onResponse(response)
-                response.release()
             }
             HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
             else -> error("Unsupported http mode: $mode")
@@ -119,34 +103,16 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
         return mutableMapOf()
     }
 
-    override fun onReceive(buffer: ByteBuf): ByteBuf? {
-        if (httpMode.get() == HttpMode.CONNECT) return buffer
-        return handleResponseParts(buffer)?.let {
-            LOGGER.debug { "Message found" }
+    override fun onReceive(message: ByteBuf): ByteBuf? {
+        if (httpMode.get() == HttpMode.CONNECT) return message
+        return httpClientCodec.onResponse(message)?.let {
+            LOGGER.debug { "Response message was decoded" }
             responseOutputQueue.offer(it)
-            buffer.retainedDuplicate().readerIndex(0)
+            it.reference
         }
     }
 
-    private fun handleResponseParts(buffer: ByteBuf): FullHttpResponse? {
-        //while (buffer.isReadable && !httpClientChannel.writeInbound(buffer.retainedSliceLine() ?: error("Part is unreadable"))) {}
-        var oldReaderIndex = buffer.readerIndex()
-        while(buffer.isReadable) {
-            httpClientChannel.writeInbound(buffer.retain())
-            if (buffer.readerIndex() == oldReaderIndex || httpClientChannel.inboundMessages().size > 0) break
-            oldReaderIndex = buffer.readerIndex()
-        }
-        if (httpClientChannel.inboundMessages().size > 0) {
-            return httpClientChannel.inboundMessages().poll() as FullHttpResponse
-        }
-        return null
-    }
-
-    private fun HttpMessage.isKeepAlive() = headers().let { headers ->
-        protocolVersion().minorVersion() == 1 && !(headers.get(CONNECTION)?.equals("close", true) ?: false) || protocolVersion().minorVersion() == 0 && headers.get(CONNECTION)?.equals("keep-alive", true) ?: false
-    }
-
-    private fun DirtyHttpRequest.isKeepAlive(): Boolean {
+    private fun DirtyHttpMessage.isKeepAlive(): Boolean {
         return version.minorVersion() == 1 && !(this.headers[CONNECTION]?.equals("close", true) ?: false) || version.minorVersion() == 0 && this.headers[CONNECTION]?.equals("keep-alive", true) ?: false
     }
 
@@ -159,7 +125,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
 
     override fun close() {
         state.close()
-        httpClientChannel.close()
+        httpClientCodec.close()
     }
 
     override fun onOpen() {

@@ -39,7 +39,6 @@ class HttpHandlerFactory: IProtocolHandlerFactory {
         HttpHandler(context, stateFactory.create(settings.stateSettings, context.channel), settings)
     }
 
-
     companion object {
         private val LOGGER = KotlinLogging.logger { this::class.java.simpleName }
     }

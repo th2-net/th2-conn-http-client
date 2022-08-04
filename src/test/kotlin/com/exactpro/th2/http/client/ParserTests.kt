@@ -2,6 +2,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
 import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
+import com.exactpro.th2.http.client.dirty.handler.parsers.StartLineParser
 import io.netty.buffer.Unpooled
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -10,10 +11,27 @@ import java.nio.charset.Charset
 class ParserTests {
 
     @Test
+    fun `line parser`() {
+        val buffer = Unpooled.buffer().writeBytes("___\n___\n___".toByteArray())
+
+        LineParser { _, _ ->
+
+        }.let { parser ->
+            Assertions.assertEquals(0, buffer.readerIndex())
+            Assertions.assertTrue(parser.parseLine(buffer))
+            Assertions.assertEquals(4, buffer.readerIndex())
+            Assertions.assertTrue(parser.parseLine(buffer))
+            Assertions.assertEquals(8, buffer.readerIndex())
+            Assertions.assertFalse(parser.parseLine(buffer))
+            Assertions.assertEquals(8, buffer.readerIndex())
+        }
+    }
+
+    @Test
     fun `Start line parser test`() {
         val firstLine = "GET /test HTTP1.1 ADDITIONAL WRONG DATA"
         val additional = "HEADER_NAME: HEADER_VALUE"
-        val parser = LineParser()
+        val parser = StartLineParser()
         repeat(2) {
             parser.test(firstLine, additional)
         }
@@ -23,13 +41,13 @@ class ParserTests {
     fun `Response status parser test`() {
         val firstLine = "HTTP1.1 200 OK WRONG DATA"
         val additional = "HEADER_NAME: HEADER_VALUE"
-        val parser = LineParser()
+        val parser = StartLineParser()
         repeat(2) {
             parser.test(firstLine, additional)
         }
 
         val buffer = Unpooled.buffer().writeBytes(firstLine.toByteArray())
-        Assertions.assertFalse(parser.parse(buffer))
+        Assertions.assertFalse(parser.parseLine(buffer))
         Assertions.assertEquals(0, buffer.readerIndex())
     }
 
@@ -43,7 +61,9 @@ class ParserTests {
         val body = "{some data}"
         val parser = HeaderParser()
         repeat(2) {
-            parser.test(mainPart, body)
+            Assertions.assertDoesNotThrow({
+                parser.test(mainPart, body)
+            }, "Exception on attempt: $it")
         }
 
         var stringHeaders = """
@@ -53,14 +73,15 @@ class ParserTests {
         """.trimIndent()
         var buffer = Unpooled.buffer().writeBytes(stringHeaders.toByteArray())
 
-        Assertions.assertFalse(parser.parse(buffer))
+        Assertions.assertFalse(parser.parseHeaders(buffer))
         buffer.release()
         stringHeaders = """
             HEADER_NAME2: HEADER_VALUE2
             
+            
         """.trimIndent()
         buffer = Unpooled.buffer().writeBytes(stringHeaders.toByteArray())
-        Assertions.assertTrue(parser.parse(buffer))
+        Assertions.assertTrue(parser.parseHeaders(buffer))
 
         parser.getHeaders().let {
             Assertions.assertEquals(3, it.size)
@@ -75,7 +96,7 @@ class ParserTests {
         val headersString = headers.toList().joinToString(separator) {"${it.first}: ${it.second}"}
         val data = "$headersString$separator$separator$body"
         val buffer = Unpooled.buffer().writeBytes(data.toByteArray())
-        check(parse(buffer)) {"Headers must have empty line"}
+        check(parseHeaders(buffer)) {"Headers must have empty line"}
 
         val headersPositions = getHeaders()
         this.reset()
@@ -86,10 +107,10 @@ class ParserTests {
         }
     }
 
-    private fun LineParser.test(statusLine: String, additional: String) {
+    private fun StartLineParser.test(statusLine: String, additional: String) {
         val separator = "\r\n"
         val buffer = Unpooled.buffer().writeBytes("$statusLine$separator$additional".toByteArray())
-        check(parse(buffer)) {"Must found end of the line"}
+        check(parseLine(buffer)) {"Must found end of the line"}
         val result = lineParts
         reset()
         statusLine.split(" ").let {

@@ -32,20 +32,6 @@ inline fun <reified T> load(defaultImpl: Class<out T>): T {
     }
 }
 
-private fun Char.isSPLenient(): Boolean {
-    // See https://tools.ietf.org/html/rfc7230#section-3.5
-    return this == ' ' || this == 0x09.toChar() || this == 0x0B.toChar() || this == 0x0C.toChar() || this == 0x0D.toChar()
-}
-
-private fun AppendableCharSequence.findSPLenient(offset: Int): Int {
-    for (result in offset until length) {
-        if (charAtUnsafe(result).isSPLenient()) {
-            return result
-        }
-    }
-    return length
-}
-
 fun ByteBuf.forEachByteIndexed(byteProcessor: (index: Int, byte: Byte) -> Boolean): Int {
     var index = 0
     return this.forEachByte {
@@ -53,7 +39,7 @@ fun ByteBuf.forEachByteIndexed(byteProcessor: (index: Int, byte: Byte) -> Boolea
     }
 }
 
-fun HeadersPointer.HttpHeaderPosition.move(step: Int) {
+fun HeadersPointer.HttpHeaderDetails.move(step: Int) {
     this.start += step
     this.end += step
 }

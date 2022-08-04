@@ -23,7 +23,7 @@ import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderParser
-import com.exactpro.th2.http.client.dirty.handler.parsers.LineParser
+import com.exactpro.th2.http.client.dirty.handler.parsers.StartLineParser
 import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultState
 import com.exactpro.th2.http.client.dirty.handler.stateapi.DefaultStateSettings
 import io.netty.buffer.Unpooled
@@ -48,16 +48,16 @@ class StateTests {
         val buffer = Unpooled.buffer().writeBytes(requestString.toByteArray())
 
         val headerParser = HeaderParser()
-        val lineParser = LineParser()
-        check(lineParser.parse(buffer))
-        check(headerParser.parse(buffer))
+        val lineParser = StartLineParser()
+        check(lineParser.parseLine(buffer))
+        check(headerParser.parseHeaders(buffer))
         val headers = headerParser.getHeaders()
         val container = HeadersPointer(requestString.indexOf("\n")+1, 17 + 17 + 19 + 3, Unpooled.buffer().writeBytes(requestString.toByteArray()), headers)
 
         val user = "test_user"
         val password = "test_password"
         val state = DefaultState(DefaultStateSettings(user, password))
-        val request = DirtyHttpRequest(MethodPointer(0, HttpMethod.GET), StringPointer(5, "/test"), VersionPointer(11, HttpVersion.HTTP_1_1), BodyPointer(82, buffer), container, buffer)
+        val request = DirtyHttpRequest(MethodPointer(0, HttpMethod.GET), StringPointer(5, "/test"), VersionPointer(11, HttpVersion.HTTP_1_1), BodyPointer(82, buffer, 25), container, buffer)
         state.onRequest(request)
         val auth = request.headers["Authorization"]
         Assertions.assertNotNull(auth)

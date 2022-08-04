@@ -17,20 +17,31 @@
 
 package com.exactpro.th2.http.client.dirty.handler.data
 
+import com.exactpro.th2.conn.dirty.tcp.core.util.replace
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.BodyPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.HeadersPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.Pointer
+import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import io.netty.buffer.ByteBuf
+import io.netty.handler.codec.DecoderResult
 
 typealias NettyHttpMethod = io.netty.handler.codec.http.HttpMethod
 typealias NettyHttpVersion = io.netty.handler.codec.http.HttpVersion
 
-abstract class DirtyHttpMessage(val headers: HeadersPointer, private val httpBody: BodyPointer, protected val reference: ByteBuf) {
+abstract class DirtyHttpMessage(protected val httpVersion: VersionPointer, val headers: HeadersPointer, private val httpBody: BodyPointer, val reference: ByteBuf, val decoderResult: DecoderResult = DecoderResult.SUCCESS) {
 
     var body: ByteBuf
         get() = httpBody.reference.readerIndex(httpBody.position)
         set(value) {
             this.httpBody.reference.writerIndex(this.httpBody.position).writeBytes(value)
+        }
+
+    var version: NettyHttpVersion
+        get() = httpVersion.value
+        set(value) = this.httpVersion.let {
+            reference.replace(it.position, reference.writerIndex(), value.text())
+            it.value = value
+            settle()
         }
 
     protected open fun settle(startSum: Int = 0): Int {

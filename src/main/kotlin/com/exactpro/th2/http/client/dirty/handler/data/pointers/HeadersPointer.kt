@@ -20,68 +20,47 @@ package com.exactpro.th2.http.client.dirty.handler.data.pointers
 import com.exactpro.th2.conn.dirty.tcp.core.util.insert
 import com.exactpro.th2.conn.dirty.tcp.core.util.remove
 import com.exactpro.th2.conn.dirty.tcp.core.util.replace
-import com.exactpro.th2.http.client.dirty.handler.parsers.HeaderValueParser
 import io.netty.buffer.ByteBuf
 
-class HeadersPointer(position: Int, private var length: Int , private val reference: ByteBuf, private val positions: MutableMap<String, HttpHeaderPosition>): Pointer(position), MutableMap<String, String> {
+class HeadersPointer(position: Int, private var length: Int , private val reference: ByteBuf, private val details: MutableMap<String, HttpHeaderDetails>): Pointer(position), MutableMap<String, String> {
 
-    private val cache: MutableMap<String, String?> = mutableMapOf()
+    override fun get(key: String): String? = details[key]?.value
 
-    override fun get(key: String): String? {
-        when(key) {
-            in cache -> return cache[key]
-            !in positions -> return null
-        }
 
-        return valueParser.parse(reference.readerIndex(positions[key]!!.start)).also {
-            cache[key] = it
-        }
+
+    override fun replace(key: String, value: String): String? = if (!details.containsKey(key)) {
+        this[key] = value
+        null
+    } else {
+        details[key]!!.also { header ->
+            (header.value.length - value.length).also { amount ->
+                expansion += amount
+                length += amount
+            }
+            reference.readerIndex(header.start).replace(header.value, value)
+            modified = true
+        }.value
     }
 
-    override fun replace(key: String, value: String): String? = when {
-        cache.contains(key) -> {
-            replaceHeaderValue(key, cache[key]!!, value)
-            value
-        }
-        positions.contains(key) -> {
-            val oldValue = checkNotNull(get(key)) { "Replace method must get value by name due existence of pointer" }
-            replaceHeaderValue(key, oldValue, value)
-            value
-        }
-        else -> null
-    }
-
-    private fun replaceHeaderValue(key: String, oldValue: String, newValue: String) {
-        val headerPosition = checkNotNull(positions[key])
-        reference.readerIndex(headerPosition.start).replace(oldValue, newValue)
-        (oldValue.length - newValue.length).also {
-            expansion += it
-            length += it
-            headerPosition.end+=it
-        }
-        modified = true
-        cache[key] = newValue
-    }
-
-    override fun put(key: String, value: String): String {
-        if (replace(key, value) != null) return value
-        cache[key] = value
+    override fun put(key: String, value: String): String = if (!details.containsKey(key)) {
         val additional = "$key: $value\r\n"
         val endOfHeaders = position + length
         reference.insert(additional, endOfHeaders)
         length+=additional.length
         expansion+=additional.length
         modified = true
-        positions[key] = HttpHeaderPosition(endOfHeaders, endOfHeaders + additional.length)
-        return value
+        details[key] = HttpHeaderDetails(endOfHeaders, endOfHeaders + additional.length, value)
+        value
+    } else {
+        replace(key, value)
+        value
     }
 
     private fun removeSingle(key: String): Boolean {
-        if (!positions.contains(key)) {
+        if (!details.contains(key)) {
             return false
         }
-        cache.remove(key)
-        val position = positions.remove(key)!!
+        val position = details.remove(key)!!
         reference.readerIndex(position.start).remove(position.start, position.end)
         moveAfter(position.start, position.start-position.end)
         modified = true
@@ -94,7 +73,7 @@ class HeadersPointer(position: Int, private var length: Int , private val refere
     }
 
     private fun moveAfter(position: Int, amount: Int) {
-        positions.forEach {
+        details.forEach {
             it.value.let { currentPos ->
                 if (currentPos.start > position) {
                     currentPos.start += amount
@@ -105,15 +84,14 @@ class HeadersPointer(position: Int, private var length: Int , private val refere
         }
     }
 
-    override fun containsKey(key: String): Boolean = positions.containsKey(key)
+    override fun containsKey(key: String): Boolean = details.containsKey(key)
 
     override fun containsValue(value: String): Boolean = error("Unsupported kind of operation")
 
-    override fun isEmpty(): Boolean = positions.isEmpty()
+    override fun isEmpty(): Boolean = details.isEmpty()
 
     override fun clear() {
-        positions.clear()
-        cache.clear()
+        details.clear()
         reference.remove(position, position+length)
         length=0
         this.expansion-=length
@@ -125,17 +103,13 @@ class HeadersPointer(position: Int, private var length: Int , private val refere
     }
 
     override val size: Int
-        get() = positions.size
+        get() = details.size
     override val entries: MutableSet<MutableMap.MutableEntry<String, String>>
         get() = error("Unsupported kind of operation")
     override val keys: MutableSet<String>
-        get() = positions.keys
+        get() = details.keys
     override val values: MutableCollection<String>
         get() = error("Unsupported kind of operation")
 
-    data class HttpHeaderPosition(var start: Int, var end: Int)
-
-    companion object {
-        val valueParser = HeaderValueParser()
-    }
+    data class HttpHeaderDetails(var start: Int, var end: Int, var value: String)
 }

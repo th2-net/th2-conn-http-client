@@ -25,7 +25,7 @@ import com.exactpro.th2.http.client.dirty.handler.data.pointers.VersionPointer
 import com.exactpro.th2.http.client.dirty.handler.data.pointers.StringPointer
 import io.netty.buffer.ByteBuf
 
-class DirtyHttpRequest(private val httpMethod: MethodPointer, private val httpUrl: StringPointer, private val httpVersion: VersionPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf): DirtyHttpMessage(headers, httpBody, reference) {
+class DirtyHttpRequest(private val httpMethod: MethodPointer, private val httpUrl: StringPointer, httpVersion: VersionPointer, httpBody: BodyPointer, headers: HeadersPointer, reference: ByteBuf): DirtyHttpMessage(httpVersion, headers, httpBody, reference) {
 
     var method: NettyHttpMethod
         get() = httpMethod.value
@@ -39,14 +39,6 @@ class DirtyHttpRequest(private val httpMethod: MethodPointer, private val httpUr
         get() = httpUrl.value
         set(value) = this.httpUrl.let {
             reference.replace(it.position, reference.writerIndex(), value)
-            it.value = value
-            settle()
-        }
-
-    var version: NettyHttpVersion
-        get() = httpVersion.value
-        set(value) = this.httpVersion.let {
-            reference.replace(it.position, reference.writerIndex(), value.text())
             it.value = value
             settle()
         }
