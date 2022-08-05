@@ -20,11 +20,11 @@ import com.exactpro.th2.conn.dirty.tcp.core.api.IChannel
 import com.exactpro.th2.http.client.dirty.handler.HttpHandler
 import com.exactpro.th2.http.client.dirty.handler.HttpHandlerSettings
 import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpRequest
+import com.exactpro.th2.http.client.dirty.handler.data.DirtyHttpResponse
 import com.exactpro.th2.http.client.dirty.handler.stateapi.IState
 import com.exactpro.th2.http.client.util.TestContext
 import com.exactpro.th2.http.client.util.createClient
 import io.netty.buffer.Unpooled
-import io.netty.handler.codec.http.FullHttpResponse
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
@@ -47,7 +47,7 @@ class ProfilerTests {
         val state = object : IState {
             val requests = AtomicInteger(0)
             val responses = AtomicInteger(0)
-            override fun onResponse(response: FullHttpResponse) {
+            override fun onResponse(response: DirtyHttpResponse) {
                 responses.incrementAndGet()
             }
 
