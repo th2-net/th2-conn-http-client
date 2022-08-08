@@ -29,6 +29,7 @@ import io.netty.handler.codec.DirtyRequestDecoder
 import io.netty.handler.codec.http.HttpMethod
 import mu.KotlinLogging
 import java.lang.Exception
+import java.util.LinkedList
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -46,6 +47,8 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
     private val lastMethod = AtomicReference<HttpMethod?>(null)
 
     private var isLastResponse = AtomicBoolean(false)
+
+    private val httpMetadataQueue = LinkedList<Map<String, String>>()
 
     override fun onOutgoing(message: ByteBuf, metadata: MutableMap<String, String>) {
         try {
@@ -65,6 +68,7 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                         state.onRequest(request)
                         LOGGER.debug { "Sending request: $request" }
                     }
+                    httpMetadataQueue.push(metadata)
                 }
                 HttpMode.CONNECT -> LOGGER.trace { "$mode: Sending data passing as tcp package" }
                 else -> error("Unsupported http mode: $mode")
@@ -93,14 +97,14 @@ open class HttpHandler(private val context: IContext<IProtocolHandlerSettings>, 
                 when(lastMethod.get()) {
                     HttpMethod.CONNECT -> if (response.code == 200) httpMode.set(HttpMode.CONNECT)
                 }
-
                 state.onResponse(response)
+                return httpMetadataQueue.removeFirst()
             }
             HttpMode.CONNECT -> LOGGER.trace { "$mode: Received data passing as tcp package" }
             else -> error("Unsupported http mode: $mode")
         }
 
-        return mutableMapOf()
+        return emptyMap()
     }
 
     override fun onReceive(message: ByteBuf): ByteBuf? {
