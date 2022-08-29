@@ -37,8 +37,8 @@ import kotlin.concurrent.withLock
 
 class HttpClient(
     https: Boolean,
-    host: String,
-    port: Int,
+    private val host: String,
+    private val port: Int,
     readTimeout: Int,
     keepAliveTimeout: Long,
     maxParallelRequests: Int,
@@ -98,7 +98,14 @@ class HttpClient(
     override fun send(request: RawHttpRequest): RawHttpResponse<Void> {
         if (!isRunning) start()
 
-        val preparedRequest = request.runCatching(prepareRequest).getOrElse {
+        val sendRequest = request.run {
+            when {
+                host != uri.host || port != uri.port -> withRequestLine(startLine.withHost("$host:$port"))
+                else -> this
+            }
+        }
+
+        val preparedRequest = sendRequest.runCatching(prepareRequest).getOrElse {
             throw IllegalStateException("Failed to prepare request: $request", it)
         }
 
