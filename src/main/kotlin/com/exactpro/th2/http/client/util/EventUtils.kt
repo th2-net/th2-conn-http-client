@@ -6,18 +6,10 @@ import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.utils.event.EventBatcher
 import org.apache.commons.lang3.exception.ExceptionUtils
 
-fun createEvent(name: String, messageId: MessageID): Event = Event.start().apply {
-    endTimestamp()
-    name(name)
-    type("Info")
-    status(Event.Status.PASSED)
-
-    messageID(messageId)
-}
-
 fun createEvent(
     name: String,
     type: String,
+    messageId: MessageID? = null,
     cause: Throwable? = null
 ): Event = Event.start().apply {
     endTimestamp()
@@ -25,22 +17,21 @@ fun createEvent(
     type(type)
     status(if (cause != null) Event.Status.FAILED else Event.Status.PASSED)
 
-    var error = cause
-
-    while (error != null) {
+    generateSequence(cause, Throwable::cause).forEach { error ->
         bodyData(EventUtils.createMessageBean(ExceptionUtils.getMessage(error)))
-        error = error.cause
+    }
+
+    messageId?.let {
+        messageID(it)
     }
 }
 
-fun EventBatcher.storeEvent(name: String, messageId: MessageID, parentEventId: String): Event {
-    val event = createEvent(name, messageId)
+fun EventBatcher.storeEvent(name: String, messageId: MessageID, parentEventId: String) {
+    val event = createEvent(name, "info", messageId)
     onEvent(event.toProtoEvent(parentEventId))
-    return event
 }
 
-fun EventBatcher.storeEvent(name: String, type: String, parentEventId: String, cause: Throwable? = null): Event {
-    val event = createEvent(name, type, cause)
+fun EventBatcher.storeEvent(name: String, type: String, parentEventId: String, cause: Throwable? = null) {
+    val event = createEvent(name, type, cause = cause)
     onEvent(event.toProtoEvent(parentEventId))
-    return event
 }

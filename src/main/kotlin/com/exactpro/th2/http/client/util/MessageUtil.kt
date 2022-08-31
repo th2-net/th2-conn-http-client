@@ -67,12 +67,13 @@ const val CONTENT_LENGTH_HEADER = "Content-Length"
 const val HOST_HEADER = "Host"
 private const val HEADER_VALUE_SEPARATOR = ";"
 
-private fun createRequest(head: Message, body: RawMessage, host: String, defaultHeaders: Map<String, List<String>>): RawHttpRequest {
+private fun createRequest(head: Message, body: RawMessage, host: String, port: Int, defaultHeaders: Map<String, List<String>>): RawHttpRequest {
     val metadata = body.metadata.propertiesMap
     val method = (head.getString(METHOD_FIELD) ?: metadata[METHOD_PROPERTY])?.uppercase() ?: DEFAULT_METHOD
     val uri = head.getString(URI_FIELD) ?: metadata[URI_PROPERTY] ?: DEFAULT_URI
 
-    val httpRequestLine = RequestLine(method, UriUtil.withHost(URI(uri), host), HTTP_1_1)
+    val endPointAddress = "$host:$port"
+    val httpRequestLine = RequestLine(method, UriUtil.withHost(URI(uri), endPointAddress), HTTP_1_1)
     val httpHeaders = RawHttpHeaders.newBuilder()
 
     head.getList(HEADERS_FIELD)?.forEach {
@@ -103,7 +104,7 @@ private fun createRequest(head: Message, body: RawMessage, host: String, default
     }
 
     if (HOST_HEADER !in headerNames) {
-        httpHeaders.with(HOST_HEADER, host)
+        httpHeaders.with(HOST_HEADER, endPointAddress)
     }
 
     defaultHeaders.forEach { (key, values) ->
@@ -132,19 +133,19 @@ private fun AnyMessage.toRaw(name: String): RawMessage = run {
     rawMessage
 }
 
-fun MessageGroup.toRequest(host: String, defaultHeaders: Map<String, List<String>>): RawHttpRequest = when (messagesCount) {
+fun MessageGroup.toRequest(host: String, port:Int, defaultHeaders: Map<String, List<String>>): RawHttpRequest = when (messagesCount) {
     0 -> error("Message group is empty")
     1 -> getMessages(0).run {
         when {
-            hasMessage() -> createRequest(message.requireType(REQUEST_MESSAGE), RawMessage.getDefaultInstance(), host, defaultHeaders)
-            hasRawMessage() -> createRequest(Message.getDefaultInstance(), rawMessage, host, defaultHeaders)
+            hasMessage() -> createRequest(message.requireType(REQUEST_MESSAGE), RawMessage.getDefaultInstance(), host, port, defaultHeaders)
+            hasRawMessage() -> createRequest(Message.getDefaultInstance(), rawMessage, host, port, defaultHeaders)
             else -> error("Single message in group is neither parsed nor raw: ${toPrettyString()}")
         }
     }
     2 -> {
         val head = getMessages(0).toParsed("Head").requireType(REQUEST_MESSAGE)
         val body = getMessages(1).toRaw("Body")
-        createRequest(head, body, host, defaultHeaders)
+        createRequest(head, body, host, port, defaultHeaders)
     }
     else -> error("Message group contains more than 2 messages")
 }

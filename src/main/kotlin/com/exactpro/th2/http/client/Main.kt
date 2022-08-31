@@ -145,9 +145,7 @@ fun run(
         registerResource("Message batcher", it::close)
     }
 
-    val eventBatcher = EventBatcher(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService) { batch ->
-        eventRouter.send(batch)
-    }.also {
+    val eventBatcher = EventBatcher(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService, eventRouter::send).also {
         registerResource("Event batcher", it::close)
     }
 
@@ -193,7 +191,7 @@ fun run(
 
     requestHandler.runCatching {
         registerResource("request-handler", ::close)
-        init(RequestHandlerContext(client, "${settings.host}:${settings.port}", settings.defaultHeaders))
+        init(RequestHandlerContext(client, settings.host, settings.port, settings.defaultHeaders))
     }.onFailure {
         LOGGER.error(it) { "Failed to init request handler" }
         eventBatcher.storeEvent("Failed to init request handler", "Error", rootEventId, it)

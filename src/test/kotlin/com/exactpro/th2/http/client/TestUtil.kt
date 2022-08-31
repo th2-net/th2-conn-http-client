@@ -47,9 +47,7 @@ fun get(
     return client.send(
         RawHttpRequest(
             RequestLine("GET", URI("/"), HTTP_1_1),
-            RawHttpHeaders.newBuilder().apply {
-                with(HOST_HEADER, "$host:443")
-            }.build(),
+            RawHttpHeaders.newBuilder().with(HOST_HEADER, "$host:443").build(),
             null,
             null
         )

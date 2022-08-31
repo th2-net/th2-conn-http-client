@@ -183,10 +183,10 @@ class ClientTest {
             with(HOST_HEADER, "localhost:$serverPort")
         }.build()
 
-        val onRequest = { request: RawHttpRequest ->
+        val onRequest = { _: RawHttpRequest ->
         }
 
-        val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
+        val onResponse = { _: RawHttpRequest, _: RawHttpResponse<*> ->
             LOGGER.info { "Response" }
         }
 

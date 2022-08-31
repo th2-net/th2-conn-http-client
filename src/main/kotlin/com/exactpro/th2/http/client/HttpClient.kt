@@ -117,9 +117,7 @@ class HttpClient(
         val isHttp11 = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1)
         val socket: Socket = try {
             options.getSocket(request.uri).apply {
-                if (isHttp11 || request.headers.getFirst("Connection").orElseGet { "" } == "Keep-Alive") {
-                    this.keepAlive = true
-                }
+                this.keepAlive = isHttp11 || request.headers["Connection"].any { it == "Keep-Alive" }
             }
         } catch (e: RuntimeException) {
             logger.error(e) { "Cannot open socket due to network error" }
