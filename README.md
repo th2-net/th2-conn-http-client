@@ -1,4 +1,4 @@
-# HTTP Client v0.6.1
+# HTTP Client v0.7.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -140,7 +140,7 @@ spec:
 
 ## Changelog
 
-### v0.6.1
+### v0.7.0
 
 #### Added:
 * Adding additional authentication headers
