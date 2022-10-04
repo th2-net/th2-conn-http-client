@@ -145,7 +145,7 @@ spec:
 ### v0.7.0
 
 #### Added:
-* Adding additional authentication headers
+* Ability to pass headers via message metadata
 
 ### v0.6.0
 
