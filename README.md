@@ -80,6 +80,8 @@ If none of them contain these values `/` and `GET` will be used as `uri` and `me
 |name|String|HTTP header name|
 |value|String|HTTP header value|
 
+#### Metadata properties prefixed with `header-` are put in the `HTTP-Request` as `HTTP-Headers`
+
 ### Outputs
 
 HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or response.   
@@ -143,7 +145,7 @@ spec:
 ### v0.7.0
 
 #### Added:
-* Ability pass headers via message metadata
+* Adding additional authentication headers
 
 ### v0.6.0
 
