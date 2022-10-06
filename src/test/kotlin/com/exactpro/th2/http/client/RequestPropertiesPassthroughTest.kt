@@ -146,9 +146,6 @@ class RequestPropertiesPassthroughTest {
             .withBody(null)
             .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
-        println("REQUEST")
-        println(request)
-
         val response = RawHttp().parseResponse(
             "HTTP/1.1 200 OK\n" +
                     "Content-Type: text/plain\n" +
