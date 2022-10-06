@@ -18,14 +18,17 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
+import com.exactpro.th2.http.client.util.parseResponseEagerly
+import com.exactpro.th2.http.client.util.tryClose
 import mu.KotlinLogging
 import rawhttp.core.HttpVersion
 import rawhttp.core.IOSupplier
 import rawhttp.core.RawHttp
-import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
+import rawhttp.core.body.BodyReader
 import rawhttp.core.client.TcpRawHttpClient
+import rawhttp.core.errors.InvalidHttpResponse
 import java.net.Socket
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicBoolean
@@ -39,7 +42,6 @@ class HttpClient(
     readTimeout: Int,
     keepAliveTimeout: Long,
     maxParallelRequests: Int,
-    private val defaultHeaders: Map<String, List<String>>,
     private val prepareRequest: (RawHttpRequest) -> RawHttpRequest,
     onRequest: (RawHttpRequest) -> Unit,
     private val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit,
@@ -105,35 +107,25 @@ class HttpClient(
 
         val preparedRequest = sendRequest.runCatching(prepareRequest).getOrElse {
             throw IllegalStateException("Failed to prepare request: $request", it)
-        }.run {
-            when {
-                defaultHeaders.isEmpty() -> this
-                defaultHeaders.keys.all(headers::contains) -> this
-                else -> withHeaders(RawHttpHeaders.newBuilder(headers).run {
-                    defaultHeaders.forEach { (header, values) ->
-                        if (!headers.contains(header)) {
-                            values.forEach { value -> with(header, value) }
-                        }
-                    }
-                    build()
-                })
-            }
         }
 
-        val response = sendRequest(preparedRequest)
-
-        response.runCatching {
-            onResponse(preparedRequest, response)
-        }.onFailure {
-            logger.error(it) { "Failed to execute onResponse hook" }
+        val response = try {
+            sendRequest(preparedRequest).also {
+                onResponse(preparedRequest, it)
+            }
+        } finally {
+            preparedRequest.body.ifPresent(BodyReader::tryClose)
         }
 
         return response
     }
 
     private fun sendRequest(request: RawHttpRequest): RawHttpResponse<Void> {
+        val isHttp11 = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1)
         val socket: Socket = try {
-            options.getSocket(request.uri)
+            options.getSocket(request.uri).apply {
+                this.keepAlive = isHttp11 || request.headers["Connection"].any { it == "Keep-Alive" }
+            }
         } catch (e: RuntimeException) {
             logger.error(e) { "Cannot open socket due to network error" }
             throw e
@@ -141,14 +133,14 @@ class HttpClient(
 
         try {
             val finalRequest = options.onRequest(request)
-            val expectContinue = !finalRequest.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1) && finalRequest.expectContinue()
+            val expectContinue = isHttp11 && finalRequest.expectContinue()
 
             val outputStream = socket.getOutputStream()
             val inputStream = socket.getInputStream()
-            options.executorService.submit(requestSender(finalRequest, outputStream, expectContinue))
+            options.executorService.execute(requestSender(finalRequest, outputStream, expectContinue))
 
             val response = if (expectContinue) {
-                val responseWaiter = ResponseWaiter { rawHttp.parseResponse(inputStream, finalRequest.startLine) }
+                val responseWaiter = ResponseWaiter { rawHttp.parseResponseEagerly(inputStream, finalRequest.startLine) }
                 if (options.shouldContinue(responseWaiter)) {
                     finalRequest.body.get().writeTo(outputStream)
                     responseWaiter.call()
@@ -156,18 +148,25 @@ class HttpClient(
                     throw RuntimeException("Unable to obtain a response due to a 100-continue " + "request not being continued")
                 }
             } else {
-                rawHttp.parseResponse(inputStream, finalRequest.startLine)
+                rawHttp.parseResponseEagerly(inputStream, finalRequest.startLine)
             }
 
             return when (response.statusCode) {
                 100 -> {
                     options.onResponse(socket, finalRequest.uri, response)
-                    options.onResponse(socket, finalRequest.uri, rawHttp.parseResponse(socket.getInputStream(), finalRequest.startLine))
+                    options.onResponse(socket, finalRequest.uri, rawHttp.parseResponseEagerly(socket.getInputStream(), finalRequest.startLine))
                 }
                 else -> options.onResponse(socket, finalRequest.uri, response)
             }
         } catch (e: Exception) {
-            logger.error(e) { "Removing socket due to network error: $socket" }
+            when {
+                e is InvalidHttpResponse && e.lineNumber == 0 && e.message == "No content" -> {
+                    logger.error { "Server closed connection while awaiting response" }
+                }
+                else -> {
+                    logger.error(e) { "Removing socket due to network error: $socket" }
+                }
+            }
             options.removeSocket(socket)
             throw e
         }

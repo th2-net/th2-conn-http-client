@@ -60,16 +60,15 @@ class RequestPropertiesPassthroughTest {
             }
         }.build()
 
-        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
         val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
-                .toRequest()
-                .withRequestLine(requestLine)
+                .toRequest("localhost", 25565, emptyMap())
                 .withBody(null)
                 .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
         if (request is Th2RawHttpRequest) {
             assertEquals(parentEventId, request.parentEventId)
             assertEquals(metadataProperties, request.metadataProperties)
+            assertEquals("localhost:25565", request.headers.getFirst("Host").get())
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }
@@ -95,7 +94,7 @@ class RequestPropertiesPassthroughTest {
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
         var request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
-                .toRequest()
+                .toRequest("", 80, emptyMap())
                 .withRequestLine(requestLine)
                 .withBody(null)
                 .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
@@ -111,7 +110,7 @@ class RequestPropertiesPassthroughTest {
 
         val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
 
-        request = messageGroup.getGroups(0).toRequest()
+        request = messageGroup.getGroups(0).toRequest("", 80, emptyMap())
 
         if (request is Th2RawHttpRequest) {
             assertEquals(parentEventId, request.parentEventId)

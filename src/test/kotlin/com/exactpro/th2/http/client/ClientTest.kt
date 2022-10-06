@@ -18,6 +18,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.CONTENT_LENGTH_HEADER
+import com.exactpro.th2.http.client.util.HOST_HEADER
 import mu.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
@@ -44,10 +45,12 @@ class ClientTest {
         private val LOGGER = KotlinLogging.logger { }
 
         private const val serverPort = 8086
-        private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
-        private var responseCount = AtomicInteger(0)
 
         private val server = TcpRawHttpServer(serverPort)
+        private val rawHttp = RawHttp()
+
+        private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
+        private var responseCount = AtomicInteger(0)
 
         private val responseData = """
           HTTP/1.1 200 OK
@@ -61,9 +64,9 @@ class ClientTest {
         @JvmStatic
         fun setUp() {
             server.start {
-                LOGGER.info { "Received request: ${it.eagerly().startLine}" }
+                it.eagerly()
                 responseCount.incrementAndGet()
-                Optional.of(RawHttp().parseResponse(responseData))
+                Optional.of(rawHttp.parseResponse(responseData))
             }
         }
 
@@ -87,6 +90,7 @@ class ClientTest {
         val requestBody = body.toByteArray()
         val httpHeaders = RawHttpHeaders.newBuilder().apply {
             with(CONTENT_LENGTH_HEADER, requestBody.size.toString())
+            with(HOST_HEADER, "localhost:$serverPort")
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
@@ -100,7 +104,7 @@ class ClientTest {
             LOGGER.debug("Response handled: ${response.statusCode}")
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  5, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  5, prepareRequest, onRequest, onResponse)
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
@@ -136,26 +140,28 @@ class ClientTest {
         val requestBody = body.toByteArray()
         val httpHeaders = RawHttpHeaders.newBuilder().apply {
             with(CONTENT_LENGTH_HEADER, requestBody.size.toString())
+            with(HOST_HEADER, "localhost:$serverPort")
             with("Connection", "Keep-Alive")
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
-            LOGGER.info("Request submitted: ${request.startLine}")
+            LOGGER.debug("Request submitted: ${request.startLine}")
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
-            requestFlag.countDown()
-            LOGGER.info("Response handled: ${response.statusCode}")
+            LOGGER.debug("Response handled: ${response.statusCode}")
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  2, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  2, prepareRequest, onRequest, onResponse)
         client.start()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
         repeat(requestFlag.count.toInt()) {
-            executor.submit {
-                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
+            executor.execute {
+                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata)).apply {
+                    requestFlag.countDown()
+                }
             }
         }
 
@@ -163,5 +169,35 @@ class ClientTest {
         client.stop()
 
         Assertions.assertEquals(0, requestFlag.count)
+    }
+
+    //@Test
+    fun `profiler test`() {
+        val parentEventID = "testParentId"
+        val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
+
+        val prepareRequest = { request: RawHttpRequest -> request }
+        val requestBody = body.toByteArray()
+        val httpHeaders = RawHttpHeaders.newBuilder().apply {
+            with(CONTENT_LENGTH_HEADER, requestBody.size.toString())
+            with(HOST_HEADER, "localhost:$serverPort")
+        }.build()
+
+        val onRequest = { _: RawHttpRequest ->
+        }
+
+        val onResponse = { _: RawHttpRequest, _: RawHttpResponse<*> ->
+            LOGGER.info { "Response" }
+        }
+
+        val client = HttpClient(false, "localhost", 25565, 60000, 5000,  1, prepareRequest, onRequest, onResponse)
+
+        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
+
+        LOGGER.info { "Starting load" }
+        while (true) {
+            Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata).runCatching(client::send)
+            Thread.sleep(1000)
+        }
     }
 }

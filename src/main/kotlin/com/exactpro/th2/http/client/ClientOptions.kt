@@ -16,20 +16,21 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.http.client.util.createExecutorService
+import com.exactpro.th2.http.client.util.tryClose
 import mu.KotlinLogging
 import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
+import rawhttp.core.body.BodyReader
 import rawhttp.core.client.TcpRawHttpClient
 import java.net.Socket
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import javax.net.SocketFactory
 import kotlin.concurrent.withLock
@@ -56,35 +57,27 @@ internal class ClientOptions(
         }
     }
 
-    private val executorService = run {
-        val counter = AtomicInteger(1)
-        Executors.newFixedThreadPool(maxParallelRequests) { runnable: Runnable? ->
-            Thread(runnable).apply {
-                isDaemon = true
-                name = "tcp-th2-client-" + counter.incrementAndGet()
-            }
-        }
-    }
+    private val executorService: ExecutorService = createExecutorService(maxParallelRequests)
 
-    override fun getExecutorService(): ExecutorService {
-        return this.executorService
-    }
+    override fun getExecutorService() = this.executorService
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
-        logger.info { "Sending request: $httpRequest" }
+        logger.debug { "Sending request: $httpRequest" }
         httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
         return httpRequest
     }
 
-    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> = try {
-        httpResponse.eagerly().also { logger.info { "Received response on socket '$socket': $it" } }
-    } catch (e: Throwable) {
-        throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
-    } finally {
+    override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> {
+        logger.debug { "Received response on socket '$socket': $httpResponse" }
+        val shouldClose = RawHttpResponse.shouldCloseConnectionAfter(httpResponse)
         when {
-            RawHttpResponse.shouldCloseConnectionAfter(httpResponse) -> removeSocket(socket)
+            shouldClose -> {
+                httpResponse.body.ifPresent(BodyReader::tryClose)
+                removeSocket(socket)
+            }
             httpResponse.statusCode != 100 -> socketPool.release(socket)
         }
+        return httpResponse.eagerly()
     }
 
     override fun getSocket(uri: URI): Socket = socketPool.acquire()
