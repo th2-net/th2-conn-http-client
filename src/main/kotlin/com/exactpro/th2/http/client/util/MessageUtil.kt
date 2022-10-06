@@ -106,7 +106,6 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
             httpHeaders.with(name.substring(HEADER_PREFIX.length), value)
     }
 
-
     return Th2RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId, metadataProperties)
 }
 
