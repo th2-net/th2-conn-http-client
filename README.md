@@ -80,7 +80,7 @@ If none of them contain these values `/` and `GET` will be used as `uri` and `me
 |name|String|HTTP header name|
 |value|String|HTTP header value|
 
-#### Metadata properties prefixed with `header-` are put in the `HTTP-Request` as `HTTP-Headers`
+Metadata properties prefixed with `header-` (case insensitive) are put in the HTTP request as headers with `header-` prefix removed
 
 ### Outputs
 
