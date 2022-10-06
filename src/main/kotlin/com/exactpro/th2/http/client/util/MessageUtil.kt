@@ -101,7 +101,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
     val metadataProperties = body.metadata.propertiesMap + head.metadata.propertiesMap
 
-    head.metadata.propertiesMap.forEach { (name, value) ->
+    metadataProperties.forEach { (name, value) ->
         if (name.startsWith(HEADER_PREFIX, ignoreCase = true))
             httpHeaders.with(name.substring(HEADER_PREFIX.length), value)
     }
