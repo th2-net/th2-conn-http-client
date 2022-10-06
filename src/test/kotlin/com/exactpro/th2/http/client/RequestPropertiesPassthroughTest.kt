@@ -120,4 +120,54 @@ class RequestPropertiesPassthroughTest {
             fail("Request type isn't Th2RawHttpRequest")
         }
     }
+
+    @Test
+    fun `Checking for headers with prefix header- `() {
+        val parentEventId = "123"
+        val metadataProperties = mapOf("abc" to "cde", "HEADER-first" to "10", "Header-second" to "3", "header-third" to "7")
+
+        val message = RawMessage.newBuilder().apply {
+            this.parentEventIdBuilder.id = parentEventId
+            this.metadataBuilder.apply {
+                putAllProperties(metadataProperties)
+                this.timestamp = Instant.now().toTimestamp()
+                this.idBuilder.apply {
+                    this.connectionId = ConnectionID.getDefaultInstance()
+                    this.direction = Direction.FIRST
+                    this.sequence = 123
+                }
+            }
+        }.build()
+
+        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
+        var request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+            .toRequest()
+            .withRequestLine(requestLine)
+            .withBody(null)
+            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
+
+        println("REQUEST")
+        println(request)
+
+        val response = RawHttp().parseResponse(
+            "HTTP/1.1 200 OK\n" +
+                    "Content-Type: text/plain\n" +
+                    "Content-Length: 9\n" +
+                    "\n" +
+                    "something"
+        )
+
+        val connectionId = ConnectionID.newBuilder().setSessionAlias("testAlias").build()
+
+        val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
+
+        request = messageGroup.getGroups(0).toRequest()
+
+        if (request is Th2RawHttpRequest) {
+            assertEquals(parentEventId, request.parentEventId)
+            assertTrue(request.metadataProperties.entries.containsAll(metadataProperties.entries))
+        } else {
+            fail("Request type isn't Th2RawHttpRequest")
+        }
+    }
 }
