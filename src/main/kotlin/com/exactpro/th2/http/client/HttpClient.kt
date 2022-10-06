@@ -29,6 +29,7 @@ import rawhttp.core.RawHttpResponse
 import rawhttp.core.body.BodyReader
 import rawhttp.core.client.TcpRawHttpClient
 import rawhttp.core.errors.InvalidHttpResponse
+import java.io.IOException
 import java.net.Socket
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicBoolean
@@ -118,6 +119,39 @@ class HttpClient(
         }
 
         return response
+    }
+
+    //TODO: DON`T MERGE IT TO MASTER
+    fun sendRequestWithoutRes(request: RawHttpRequest) {
+        val isHttp11 = !request.startLine.httpVersion.isOlderThan(HttpVersion.HTTP_1_1)
+        val socket: Socket = try {
+            options.getSocket(request.uri).apply {
+                this.keepAlive = isHttp11 || request.headers["Connection"].any { it == "Keep-Alive" }
+            }
+        } catch (e: RuntimeException) {
+            logger.error(e) { "Cannot open socket due to network error" }
+            throw e
+        }
+
+        try {
+            val finalRequest = options.onRequest(request)
+            var expectContinue = isHttp11 && finalRequest.expectContinue()
+
+            val outputStream = socket.getOutputStream()
+            options.executorService.execute {
+                try {
+                    request.writeTo(outputStream)
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                    expectContinue = false
+                }
+                (options as ClientOptions).onSingleRequest(socket, !expectContinue)
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Removing socket due to network error: $socket" }
+            options.removeSocket(socket)
+            throw e
+        }
     }
 
     private fun sendRequest(request: RawHttpRequest): RawHttpResponse<Void> {

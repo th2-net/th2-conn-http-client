@@ -70,14 +70,24 @@ internal class ClientOptions(
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> {
         logger.debug { "Received response on socket '$socket': $httpResponse" }
         val shouldClose = RawHttpResponse.shouldCloseConnectionAfter(httpResponse)
-        when {
-            shouldClose -> {
-                httpResponse.body.ifPresent(BodyReader::tryClose)
-                removeSocket(socket)
+        return httpResponse.eagerly().also {
+            when {
+                shouldClose -> {
+                    httpResponse.body.ifPresent(BodyReader::tryClose)
+                    removeSocket(socket)
+                }
+                httpResponse.statusCode != 100 -> socketPool.release(socket)
             }
-            httpResponse.statusCode != 100 -> socketPool.release(socket)
         }
-        return httpResponse.eagerly()
+    }
+
+    /**
+     * This method is only for temporary usage due task
+     */
+    fun onSingleRequest(socket: Socket, shouldClose: Boolean) = if (shouldClose) {
+        removeSocket(socket)
+    } else {
+        socketPool.release(socket)
     }
 
     override fun getSocket(uri: URI): Socket = socketPool.acquire()
