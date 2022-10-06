@@ -30,7 +30,9 @@ import com.exactpro.th2.common.schema.message.QueueAttribute.FIRST
 import com.exactpro.th2.common.schema.message.QueueAttribute.SECOND
 import com.exactpro.th2.common.schema.message.storeEvent
 import com.exactpro.th2.common.utils.event.EventBatcher
-import com.exactpro.th2.common.utils.event.MessageBatcherDirection
+import com.exactpro.th2.common.utils.message.RAW_DIRECTION_SELECTOR
+import com.exactpro.th2.common.utils.message.RawMessageBatcher
+import com.exactpro.th2.common.utils.message.direction
 import com.exactpro.th2.http.client.api.IAuthSettings
 import com.exactpro.th2.http.client.api.IAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.IRequestHandler
@@ -135,8 +137,8 @@ fun run(
         registerResource("Batcher scheduled executor", it::shutdownNow)
     }
 
-    val messageBatcher = MessageBatcherDirection(settings.maxBatchSize, settings.maxFlushTime, scheduledExecutorService, onBatch = { batch, direction ->
-        messageRouter.send(batch, when(direction) {
+    val messageBatcher = RawMessageBatcher(settings.maxBatchSize, settings.maxFlushTime, RAW_DIRECTION_SELECTOR, scheduledExecutorService, onBatch = { batch ->
+        messageRouter.send(batch, when(val direction = batch.getGroups(0).direction) {
             Direction.FIRST -> FIRST
             Direction.SECOND -> SECOND
             else -> error("Unsupported direction $direction")
@@ -150,13 +152,17 @@ fun run(
     }
 
     val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
-        val rawMessage = request.toRawMessage(connectionId, outgoingSequence()).build()
-        messageBatcher.onMessage(rawMessage, Direction.SECOND)
+        val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
+        messageBatcher.onMessage(rawMessage.apply {
+            this.metadataBuilder.idBuilder.direction = Direction.SECOND
+        })
         eventBatcher.storeEvent("Sent HTTP request", rawMessage.metadata.id, if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId)
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageBatcher.onMessage(response.toRawMessage(connectionId, incomingSequence(), request).build(), Direction.FIRST)
+        messageBatcher.onMessage(response.toRawMessage(connectionId, incomingSequence(), request).apply {
+            this.metadataBuilder.idBuilder.direction = Direction.FIRST
+        })
         try {
             stateManager.onResponse(response)
         } catch (e: Exception) {
