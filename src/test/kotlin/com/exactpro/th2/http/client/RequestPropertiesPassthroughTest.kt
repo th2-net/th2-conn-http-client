@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
+import rawhttp.core.RawHttpRequest
 import rawhttp.core.RequestLine
 import java.net.URI
 import java.time.Instant
@@ -122,9 +123,9 @@ class RequestPropertiesPassthroughTest {
     }
 
     @Test
-    fun `Checking for headers with prefix header- `() {
+    fun `Checking the correct filtering for headers prefixed with header-`() {
         val parentEventId = "123"
-        val metadataProperties = mapOf("abc" to "cde", "HEADER-first" to "10", "Header-second" to "3", "header-third" to "7")
+        val metadataProperties = mapOf("HEADER-first" to "10", "Header-second" to "3", "header-third" to "7")
 
         val message = RawMessage.newBuilder().apply {
             this.parentEventIdBuilder.id = parentEventId
@@ -140,29 +141,25 @@ class RequestPropertiesPassthroughTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        var request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
             .toRequest()
             .withRequestLine(requestLine)
             .withBody(null)
             .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
-        val response = RawHttp().parseResponse(
-            "HTTP/1.1 200 OK\n" +
-                    "Content-Type: text/plain\n" +
-                    "Content-Length: 9\n" +
-                    "\n" +
-                    "something"
-        )
+        val header = RawHttpHeaders.newBuilder()
+            .with("first", "10")
+            .with("second", "3")
+            .with("third", "7")
+            .build()
 
-        val connectionId = ConnectionID.newBuilder().setSessionAlias("testAlias").build()
+        val example = RawHttpRequest(null, header, null, null)
+            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO).withRequestLine(requestLine)
 
-        val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
-
-        request = messageGroup.getGroups(0).toRequest()
-
-        if (request is Th2RawHttpRequest) {
-            assertEquals(parentEventId, request.parentEventId)
-            assertTrue(request.metadataProperties.entries.containsAll(metadataProperties.entries))
+        if (example is RawHttpRequest) {
+            println(example.headers)
+            println(request.headers)
+            assertTrue(example.headers.headerNames.containsAll(request.headers.headerNames))
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }
