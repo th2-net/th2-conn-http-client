@@ -1,4 +1,4 @@
-# HTTP Client v0.6.0
+# HTTP Client v0.7.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -80,6 +80,8 @@ If none of them contain these values `/` and `GET` will be used as `uri` and `me
 |name|String|HTTP header name|
 |value|String|HTTP header value|
 
+Metadata properties prefixed with `header-` (case insensitive) are put in the HTTP request as headers with `header-` prefix removed
+
 ### Outputs
 
 HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or response.   
@@ -139,6 +141,11 @@ spec:
 ```
 
 ## Changelog
+
+### v0.7.0
+
+#### Added:
+* Ability to pass headers via message metadata
 
 ### v0.6.0
 

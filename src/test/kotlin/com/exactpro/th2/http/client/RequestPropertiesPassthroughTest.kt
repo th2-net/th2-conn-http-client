@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test
 import rawhttp.core.HttpVersion
 import rawhttp.core.RawHttp
 import rawhttp.core.RawHttpHeaders
+import rawhttp.core.RawHttpRequest
 import rawhttp.core.RequestLine
 import java.net.URI
 import java.time.Instant
@@ -116,6 +117,49 @@ class RequestPropertiesPassthroughTest {
         if (request is Th2RawHttpRequest) {
             assertEquals(parentEventId, request.parentEventId)
             assertTrue(request.metadataProperties.entries.containsAll(metadataProperties.entries))
+        } else {
+            fail("Request type isn't Th2RawHttpRequest")
+        }
+    }
+
+    @Test
+    fun `Checking the correct filtering for headers prefixed with header-`() {
+        val parentEventId = "123"
+        val metadataProperties = mapOf("HEADER-first" to "10", "Header-second" to "3", "header-third" to "7")
+
+        val message = RawMessage.newBuilder().apply {
+            this.parentEventIdBuilder.id = parentEventId
+            this.metadataBuilder.apply {
+                putAllProperties(metadataProperties)
+                this.timestamp = Instant.now().toTimestamp()
+                this.idBuilder.apply {
+                    this.connectionId = ConnectionID.getDefaultInstance()
+                    this.direction = Direction.FIRST
+                    this.sequence = 123
+                }
+            }
+        }.build()
+
+        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
+        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+            .toRequest()
+            .withRequestLine(requestLine)
+            .withBody(null)
+            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
+
+        val header = RawHttpHeaders.newBuilder()
+            .with("first", "10")
+            .with("second", "3")
+            .with("third", "7")
+            .build()
+
+        val example = RawHttpRequest(null, header, null, null)
+            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO).withRequestLine(requestLine)
+
+        if (example is RawHttpRequest) {
+            println(example.headers)
+            println(request.headers)
+            assertTrue(example.headers.headerNames.containsAll(request.headers.headerNames))
         } else {
             fail("Request type isn't Th2RawHttpRequest")
         }

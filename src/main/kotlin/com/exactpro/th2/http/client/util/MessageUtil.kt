@@ -53,6 +53,7 @@ private const val URI_FIELD = "uri"
 private const val HEADERS_FIELD = "headers"
 private const val HEADER_NAME_FIELD = "name"
 private const val HEADER_VALUE_FIELD = "value"
+private const val HEADER_PREFIX = "header-"
 
 private const val METHOD_PROPERTY = METHOD_FIELD
 private const val URI_PROPERTY = URI_FIELD
@@ -99,6 +100,11 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
 
     val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
     val metadataProperties = body.metadata.propertiesMap + head.metadata.propertiesMap
+
+    metadataProperties.forEach { (name, value) ->
+        if (name.startsWith(HEADER_PREFIX, ignoreCase = true))
+            httpHeaders.with(name.substring(HEADER_PREFIX.length), value)
+    }
 
     return Th2RawHttpRequest(httpRequestLine, httpHeaders.build(), httpBody, null, parentEventId, metadataProperties)
 }
