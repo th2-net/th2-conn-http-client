@@ -49,6 +49,7 @@ internal class ClientOptions(
     private val socketPool: SocketPool = SocketPool(host, port, keepAliveTimeout, maxParallelRequests) { host, port ->
         factoryLock.withLock {
             try {
+                logger.trace { "Trying to open new socket for $host:$port" }
                 socketFactory.createSocket(host, port).also {
                     it.soTimeout = readTimeout
                     logger.debug { "Created socket $it" }
