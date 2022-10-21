@@ -46,13 +46,18 @@ internal class ClientOptions(
     private val logger = KotlinLogging.logger {}
     private val factoryLock = ReentrantLock()
 
-
     private val socketPool: SocketPool = SocketPool(host, port, keepAliveTimeout, maxParallelRequests) { host, port ->
         factoryLock.withLock {
-            socketFactory.createSocket(host, port).also {
-                it.soTimeout = readTimeout
-                logger.debug { "Created socket $it" }
+            try {
+                socketFactory.createSocket(host, port).also {
+                    it.soTimeout = readTimeout
+                    logger.debug { "Created socket $it" }
+                }
+            } catch (e:Throwable) {
+                logger.error(e) { "Cannot open socket due to network error" }
+                throw e
             }
+
         }
     }
 
@@ -112,7 +117,7 @@ internal class ClientOptions(
         private val expirationTimes = ConcurrentHashMap<Socket, Long>()
 
 
-        fun acquire(): Socket {
+        fun acquire(): Socket = runCatching {
             semaphore.acquire()
 
             var socket = sockets.poll().let { socket ->
@@ -134,6 +139,9 @@ internal class ClientOptions(
             return socket.apply {
                 expirationTimes[socket] = currentTime + keepAliveTimeout
             }
+        }.getOrElse {
+            semaphore.release()
+            throw it
         }
 
         fun release(socket: Socket) {

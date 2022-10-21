@@ -132,12 +132,7 @@ class HttpClient(
     }
 
     private fun sendRequest(request: RawHttpRequest): RawHttpResponse<Void> {
-        val socket: Socket = try {
-            options.getSocket(request.uri)
-        } catch (e: RuntimeException) {
-            logger.error(e) { "Cannot open socket due to network error" }
-            throw e
-        }
+        val socket: Socket = options.getSocket(request.uri)
 
         try {
             val finalRequest = options.onRequest(request)
