@@ -33,7 +33,7 @@ jobs:
         uses: christian-draeger/write-properties@1.1.0
         with:
           path: gradle.properties
-          properties: release_version
+          property: release_version
           value: ${{ steps.release_ver.outputs.value }}                
       - name: Show custom release version
         run: echo ${{ steps.release_ver.outputs.value }}
