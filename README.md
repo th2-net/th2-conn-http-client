@@ -1,4 +1,4 @@
-# HTTP Client v0.7.0
+# HTTP Client v0.7.1
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -99,7 +99,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 1.0.0
+  image-version: 0.7.1
   custom-config:
     https: false
     host: 127.0.0.1
@@ -142,9 +142,16 @@ spec:
 
 ## Changelog
 
+### v0.7.1
+
+#### Changed:
+
+* Bump `com.exactpro.th2:common` dependency to `3.41.1`
+
 ### v0.7.0
 
 #### Added:
+
 * Ability to pass headers via message metadata
 
 ### v0.6.0
