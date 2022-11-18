@@ -42,6 +42,7 @@ import com.exactpro.th2.http.client.api.impl.BasicStateManager
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.CertificateConverter
 import com.exactpro.th2.http.client.util.PrivateKeyConverter
+import com.exactpro.th2.http.client.util.eventIds
 import com.exactpro.th2.http.client.util.toBatch
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toRawMessage
@@ -185,9 +186,11 @@ fun run(
     val listener = MessageListener<MessageGroupBatch> { _, message ->
         message.groupsList.forEach { group ->
             sendService.submit {
-                group.runCatching(requestHandler::onRequest).recoverCatching {
-                    LOGGER.error(it) { "Failed to handle message group: ${group.toPrettyString()}" }
-                    eventRouter.storeEvent(rootEventId, "Failed to handle message group: ${group.toPrettyString()}", "Error", it)
+                group.runCatching(requestHandler::onRequest).recoverCatching { error ->
+                    LOGGER.error(error) { "Failed to handle message group: ${group.toPrettyString()}" }
+                    group.eventIds
+                        .ifEmpty { sequenceOf(rootEventId) }
+                        .forEach { eventRouter.storeEvent(it, "Failed to handle message group", "Error", error) }
                 }
             }
         }
