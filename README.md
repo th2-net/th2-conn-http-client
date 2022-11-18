@@ -1,4 +1,4 @@
-# HTTP Client v0.7.1
+# HTTP Client v0.7.2
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -99,7 +99,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.7.1
+  image-version: 0.7.2
   custom-config:
     https: false
     host: 127.0.0.1
@@ -141,6 +141,12 @@ spec:
 ```
 
 ## Changelog
+
+### v0.7.2
+
+#### Added:
+
+* Publish `Failed to handle message group` event for each message in group with present parent event id
 
 ### v0.7.1
 

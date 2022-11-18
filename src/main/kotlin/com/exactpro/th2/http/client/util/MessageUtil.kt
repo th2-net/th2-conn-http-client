@@ -192,3 +192,8 @@ private fun HttpMessage.toRawMessage(connectionId: ConnectionID, direction: Dire
 
 fun RawHttpRequest.toRawMessage(connectionId: ConnectionID, sequence: Long): RawMessage.Builder = toRawMessage(connectionId, SECOND, sequence, this)
 fun RawHttpResponse<*>.toRawMessage(connectionId: ConnectionID, sequence: Long, request: RawHttpRequest): RawMessage.Builder = toRawMessage(connectionId, FIRST, sequence, request)
+
+val MessageGroup.eventIds: Sequence<String>
+    get() = messagesList.asSequence()
+        .map { if (it.hasMessage()) it.message.parentEventId.id else it.rawMessage.parentEventId.id }
+        .filter(String::isNotBlank)
