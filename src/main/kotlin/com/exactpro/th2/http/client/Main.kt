@@ -21,6 +21,7 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.EventBatch
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageGroupBatch
 import com.exactpro.th2.common.grpc.MessageID
 import com.exactpro.th2.common.schema.factory.CommonFactory
@@ -103,7 +104,7 @@ fun main(args: Array<String>) = try {
     val eventRouter = factory.eventBatchRouter
     val messageRouter = factory.messageRouterMessageGroupBatch
 
-    run(settings, eventRouter, messageRouter, stateManager, requestHandler) { resource, destructor ->
+    run(settings, eventRouter, messageRouter, stateManager, requestHandler, factory.rootEventId) { resource, destructor ->
         resources += resource to destructor
     }
 } catch (e: Exception) {
@@ -117,15 +118,10 @@ fun run(
     messageRouter: MessageRouter<MessageGroupBatch>,
     stateManager: IStateManager,
     requestHandler: IRequestHandler,
-    registerResource: (name: String, destructor: () -> Unit) -> Unit
+    rootEventId: EventID,
+    registerResource: (name: String, destructor: () -> Unit) -> Unit,
 ) {
     val connectionId = ConnectionID.newBuilder().setSessionAlias(settings.sessionAlias).build()
-
-    val rootEventId = eventRouter.storeEvent(Event.start().apply {
-        endTimestamp()
-        name("HTTP client '${settings.sessionAlias}' ${Instant.now()}")
-        type("Microservice")
-    }).id
 
     val incomingSequence = createSequence()
     val outgoingSequence = createSequence()
@@ -135,9 +131,10 @@ fun run(
 
         messageRouter.send(rawMessage.toBatch(), SECOND.toString())
         eventRouter.storeEvent(
-            "Sent HTTP request",
-            if (rawMessage.hasParentEventId()) rawMessage.parentEventId.id else rootEventId,
-            rawMessage.metadata.id
+            Event
+                .start()
+                .name("Sent HTTP request"),
+            if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId
         )
     }
 
@@ -190,7 +187,7 @@ fun run(
                     LOGGER.error(error) { "Failed to handle message group: ${group.toPrettyString()}" }
                     group.eventIds
                         .ifEmpty { sequenceOf(rootEventId) }
-                        .forEach { eventRouter.storeEvent(it, "Failed to handle message group", "Error", error) }
+                        .forEach { eventRouter.storeEvent(it as EventID, "Failed to handle message group", "Error", error) }
                 }
             }
         }

@@ -160,11 +160,11 @@ private fun ByteArrayOutputStream.toRawMessage(
     this.body = ByteString.copyFrom(toByteArray())
     this.metadataBuilder {
         putAllProperties(metadataProperties)
-        this.timestamp = Instant.now().toTimestamp()
         this.idBuilder {
             this.connectionId = connectionId
             this.direction = direction
             this.sequence = sequence
+            timestamp = Instant.now().toTimestamp()
         }
     }
 }

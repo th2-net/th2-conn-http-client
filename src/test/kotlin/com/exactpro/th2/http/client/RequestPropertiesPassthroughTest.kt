@@ -52,11 +52,11 @@ class RequestPropertiesPassthroughTest {
             this.parentEventIdBuilder.id = parentEventId
             this.metadataBuilder.apply {
                 putAllProperties(metadataProperties)
-                this.timestamp = Instant.now().toTimestamp()
                 this.idBuilder.apply {
                     this.connectionId = ConnectionID.getDefaultInstance()
                     this.direction = Direction.FIRST
                     this.sequence = 123
+                    this.timestamp = Instant.now().toTimestamp()
                 }
             }
         }.build()
@@ -85,11 +85,11 @@ class RequestPropertiesPassthroughTest {
             this.parentEventIdBuilder.id = parentEventId
             this.metadataBuilder.apply {
                 putAllProperties(metadataProperties)
-                this.timestamp = Instant.now().toTimestamp()
                 this.idBuilder.apply {
                     this.connectionId = ConnectionID.getDefaultInstance()
                     this.direction = Direction.FIRST
                     this.sequence = 123
+                    this.timestamp = Instant.now().toTimestamp()
                 }
             }
         }.build()
@@ -131,11 +131,11 @@ class RequestPropertiesPassthroughTest {
             this.parentEventIdBuilder.id = parentEventId
             this.metadataBuilder.apply {
                 putAllProperties(metadataProperties)
-                this.timestamp = Instant.now().toTimestamp()
                 this.idBuilder.apply {
                     this.connectionId = ConnectionID.getDefaultInstance()
                     this.direction = Direction.FIRST
                     this.sequence = 123
+                    this.timestamp = Instant.now().toTimestamp()
                 }
             }
         }.build()
