@@ -18,6 +18,7 @@ package com.exactpro.th2.http.client.api.impl
 
 import com.exactpro.th2.http.client.api.IStateManager
 import com.exactpro.th2.http.client.api.IStateManager.StateManagerContext
+import com.google.auto.service.AutoService
 import rawhttp.core.RawHttpHeaders
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -25,6 +26,7 @@ import rawhttp.core.client.RawHttpClient
 import java.util.Base64
 import kotlin.text.Charsets.UTF_8
 
+@AutoService(IStateManager::class)
 class BasicStateManager : IStateManager {
     private lateinit var client: RawHttpClient<*>
     private var settings: BasicAuthSettings? = null

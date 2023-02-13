@@ -18,7 +18,9 @@ package com.exactpro.th2.http.client.api.impl
 
 import com.exactpro.th2.http.client.api.IAuthSettings
 import com.exactpro.th2.http.client.api.IAuthSettingsTypeProvider
+import com.google.auto.service.AutoService
 
+@AutoService(IAuthSettingsTypeProvider::class)
 class BasicAuthSettingsTypeProvider : IAuthSettingsTypeProvider {
     override val type: Class<out IAuthSettings> = BasicAuthSettings::class.java
 }
