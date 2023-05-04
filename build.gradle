@@ -6,6 +6,7 @@ plugins {
     id 'com.palantir.docker' version '0.25.0'
     id 'org.jetbrains.kotlin.jvm' version "${kotlin_version}"
     id 'org.jetbrains.kotlin.kapt' version "${kotlin_version}"
+    id "org.owasp.dependencycheck" version "8.1.2"
 }
 
 ext {
@@ -153,15 +154,15 @@ clean {
 
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.1.0')
+    api platform('com.exactpro.th2:bom:4.2.0')
 
-    implementation 'com.exactpro.th2:common:5.1.0-dev-version-5+'
+    implementation 'com.exactpro.th2:common:5.2.0'
     implementation 'org.slf4j:slf4j-api'
 
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
     implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
-    implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
+    implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.5.2'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
 
 
