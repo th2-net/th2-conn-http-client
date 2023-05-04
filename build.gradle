@@ -156,13 +156,13 @@ clean {
 dependencies {
     api platform('com.exactpro.th2:bom:4.2.0')
 
-    implementation 'com.exactpro.th2:common:5.1.0-dev-version-5+'
+    implementation 'com.exactpro.th2:common:5.2.0'
     implementation 'org.slf4j:slf4j-api'
 
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
     implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
-    implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.5.2'
+    implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
 
 
