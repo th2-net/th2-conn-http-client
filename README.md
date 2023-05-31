@@ -1,4 +1,4 @@
-# HTTP Client v0.8.0
+# HTTP Client v0.9.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -12,9 +12,12 @@ Main configuration is done via setting following properties in a custom configur
 + **readTimeout** - socket read timeout in ms (`5000` by default)
 + **keepAliveTimeout** - socket inactivity timeout in ms (`15000` by default)
 + **validateCertificates** - enables/disables server certificate validation (`true` by default)
-+ **clientCertificate** - path to client X.509 certificate in PEM format (requires `certificatePrivateKey`, `null` by default)
-+ **certificatePrivateKey** - path to client certificate RSA private key (PKCS8 encoded) in PEM format (`null` by default)
-+ **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers are not affected, empty by default)
++ **clientCertificate** - path to client X.509 certificate in PEM format (requires `certificatePrivateKey`, `null` by
+  default)
++ **certificatePrivateKey** - path to client certificate RSA private key (PKCS8 encoded) in PEM format (`null` by
+  default)
++ **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers
+  are not affected, empty by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (`null` by default)
 
@@ -57,8 +60,10 @@ This section describes messages received and by produced by the service
 
 This service receives HTTP requests via MQ as `MessageGroup`s containing one of:
 
-* a single `RawMessage` containing request body, which can have `uri`, `method`, and `contentType` properties in its metadata, which will be used in resulting request
-* a single `Message` with `Request` message type containing HTTP request line and headers and a `RawMessage` described above
+* a single `RawMessage` containing request body, which can have `uri`, `method`, and `contentType` properties in its
+  metadata, which will be used in resulting request
+* a single `Message` with `Request` message type containing HTTP request line and headers and a `RawMessage` described
+  above
 
 If both `Message` and `RawMessage` contain `uri`, `method`, and `contentType`, values from `Message` take precedence.  
 If none of them contain these values `/` and `GET` will be used as `uri` and `method` values respectively
@@ -67,25 +72,28 @@ If none of them contain these values `/` and `GET` will be used as `uri` and `me
 
 * Request
 
-|Field|Type|Description|
-|:---:|:---:|:---:|
-|method|String|HTTP method name (e.g. GET, POST, etc.)|
-|uri|String|Request URI (e.g. /some/request/path?param1=value1&param2=value2...)|
-|headers|List\<Header>|HTTP headers (e.g. Host, Content-Length, etc.)|
+|  Field  |     Type      |                             Description                              |
+|:-------:|:-------------:|:--------------------------------------------------------------------:|
+| method  |    String     |               HTTP method name (e.g. GET, POST, etc.)                |
+|   uri   |    String     | Request URI (e.g. /some/request/path?param1=value1&param2=value2...) |
+| headers | List\<Header> |            HTTP headers (e.g. Host, Content-Length, etc.)            |
 
 * Header
 
-|Field|Type|Description|
-|:---:|:---:|:---:|
-|name|String|HTTP header name|
-|value|String|HTTP header value|
+| Field |  Type  |    Description    |
+|:-----:|:------:|:-----------------:|
+| name  | String | HTTP header name  |
+| value | String | HTTP header value |
 
-Metadata properties prefixed with `header-` (case insensitive) are put in the HTTP request as headers with `header-` prefix removed
+Metadata properties prefixed with `header-` (case insensitive) are put in the HTTP request as headers with `header-`
+prefix removed
 
 ### Outputs
 
-HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or response.   
-`RawMessage` also has `uri`, `method`, and `contentType` metadata properties set equal to URI, method, and content type of request (or a response received for the request). In case of response request metadata properties and parent event id
+HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or
+response.   
+`RawMessage` also has `uri`, `method`, and `contentType` metadata properties set equal to URI, method, and content type
+of request (or a response received for the request). In case of response request metadata properties and parent event id
 are copied into response message.
 
 ## Deployment via `infra-mgr`
@@ -142,7 +150,15 @@ spec:
 
 ## Changelog
 
+### v0.9.0
+
+* kotlin upgrade to `1.6.21`
+* owasp upgrade to `8.2.1`
+* th2-bom upgrade to `4.2.0`
+* th2-common upgrade to `5.3.0`
+
 ### v0.8.0
+
 * Vulnerability check pipeline step
 * th2-common upgrade to `3.44.0`
 * th2-bom upgrade to `4.1.0`

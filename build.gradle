@@ -6,6 +6,7 @@ plugins {
     id 'com.palantir.docker' version '0.25.0'
     id 'org.jetbrains.kotlin.jvm' version "${kotlin_version}"
     id 'org.jetbrains.kotlin.kapt' version "${kotlin_version}"
+    id "org.owasp.dependencycheck" version "8.2.1"
 }
 
 ext {
@@ -22,16 +23,16 @@ repositories {
     mavenCentral()
 
     maven {
-            name 'Sonatype_snapshots'
-            url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
     }
 
     maven {
-            name 'Sonatype_releases'
-            url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
     }
 
-    configurations.all {
+    configurations.configureEach {
         resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
         resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
     }
@@ -51,33 +52,40 @@ jar {
     }
 }
 
+configurations {
+    compileClasspath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 java {
     withJavadocJar()
     withSourcesJar()
 }
 
 // conditionals for publications
-tasks.withType(PublishToMavenRepository) {
+tasks.withType(PublishToMavenRepository).configureEach {
     onlyIf {
         (repository == publishing.repositories.nexusRepository &&
-            project.hasProperty('nexus_user') &&
-            project.hasProperty('nexus_password') &&
-            project.hasProperty('nexus_url')) ||
-        (repository == publishing.repositories.sonatype &&
-            project.hasProperty('sonatypeUsername') &&
-            project.hasProperty('sonatypePassword')) ||
-        (repository == publishing.repositories.localRepo)
+                project.hasProperty('nexus_user') &&
+                project.hasProperty('nexus_password') &&
+                project.hasProperty('nexus_url')) ||
+                (repository == publishing.repositories.sonatype &&
+                        project.hasProperty('sonatypeUsername') &&
+                        project.hasProperty('sonatypePassword')) ||
+                (repository == publishing.repositories.localRepo)
     }
 }
-tasks.withType(Sign) {
-    onlyIf { project.hasProperty('signingKey') &&
-        project.hasProperty('signingPassword')
+tasks.withType(Sign).configureEach {
+    onlyIf {
+        project.hasProperty('signingKey') &&
+                project.hasProperty('signingPassword')
     }
 }
 // disable running task 'initializeSonatypeStagingRepository' on a gitlab
-tasks.whenTaskAdded {task ->
-    if(task.name.equals('initializeSonatypeStagingRepository') &&
-        !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
+tasks.configureEach { task ->
+    if (task.name.equals('initializeSonatypeStagingRepository') &&
+            !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
     ) {
         task.enabled = false
     }
@@ -88,29 +96,29 @@ publishing {
         mavenJava(MavenPublication) {
             from(components.java)
             pom {
-              name = rootProject.name
-              packaging = 'jar'
-              description = rootProject.description
-              url = vcs_url
-              scm {
+                name = rootProject.name
+                packaging = 'jar'
+                description = rootProject.description
                 url = vcs_url
-              }
-              licenses {
-                license {
-                  name = 'The Apache License, Version 2.0'
-                  url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                scm {
+                    url = vcs_url
                 }
-              }
-              developers {
-                developer {
-                  id = 'developer'
-                  name = 'developer'
-                  email = 'developer@exactpro.com'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
                 }
-              }
-              scm {
-                url = vcs_url
-              }
+                developers {
+                    developer {
+                        id = 'developer'
+                        name = 'developer'
+                        email = 'developer@exactpro.com'
+                    }
+                }
+                scm {
+                    url = vcs_url
+                }
             }
         }
     }
@@ -153,19 +161,19 @@ clean {
 
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.1.0')
+    api platform('com.exactpro.th2:bom:4.2.0')
 
-    implementation 'com.exactpro.th2:common:5.1.0-dev-version-5+'
+    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5111091854-6528835-SNAPSHOT'
     implementation 'org.slf4j:slf4j-api'
 
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
+    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: kotlin_version
+    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect', version: kotlin_version
     implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
     implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
 
 
-    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5'
+    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5', version: kotlin_version
     testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'
 
     compileOnly 'com.google.auto.service:auto-service:1.0.1'
@@ -205,4 +213,15 @@ compileTestKotlin {
 
 test {
     useJUnitPlatform()
+}
+
+dependencyCheck {
+    formats = ['SARIF', 'JSON', 'HTML']
+    failBuildOnCVSS = 5
+
+    analyzers {
+        assemblyEnabled = false
+        nugetconfEnabled = false
+        nodeEnabled = false
+    }
 }
