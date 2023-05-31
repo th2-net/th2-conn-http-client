@@ -1,4 +1,4 @@
-# HTTP Client v0.8.0
+# HTTP Client v2.0.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -141,6 +141,11 @@ spec:
 ```
 
 ## Changelog
+### v2.0.0
+* books and pages support
+* owasp plugin check
+* th2-common upgrade to `5.2.0`
+* th2-bom upgrade to `4.2.0`
 
 ### v0.8.0
 * Vulnerability check pipeline step
