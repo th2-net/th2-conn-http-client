@@ -21,7 +21,9 @@ import com.exactpro.th2.http.client.HttpClient
 import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.util.toRequest
+import com.google.auto.service.AutoService
 
+@AutoService(IRequestHandler::class)
 class BasicRequestHandler : IRequestHandler {
     private lateinit var client: HttpClient
 
