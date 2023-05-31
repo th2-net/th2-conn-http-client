@@ -154,7 +154,8 @@ private fun ByteArrayOutputStream.toRawMessage(
     direction: Direction,
     sequence: Long,
     metadataProperties: Map<String, String>,
-    parentEventId: String? = null
+    bookName: String,
+    parentEventId: String? = null,
 ) = RawMessage.newBuilder().apply {
     parentEventId?.let(parentEventIdBuilder::setId)
     this.body = ByteString.copyFrom(toByteArray())
@@ -164,12 +165,19 @@ private fun ByteArrayOutputStream.toRawMessage(
             this.connectionId = connectionId
             this.direction = direction
             this.sequence = sequence
+            this.bookName = bookName
             timestamp = Instant.now().toTimestamp()
         }
     }
 }
 
-private fun HttpMessage.toRawMessage(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): RawMessage.Builder {
+private fun HttpMessage.toRawMessage(
+    connectionId: ConnectionID,
+    direction: Direction,
+    sequence: Long,
+    bookName: String,
+    request: RawHttpRequest
+): RawMessage.Builder {
     val (metadataProperties, parentEventId) = when (request) {
         is Th2RawHttpRequest -> request.metadataProperties.toMutableMap() to request.parentEventId
         else -> mutableMapOf<String, String>() to null
@@ -186,12 +194,12 @@ private fun HttpMessage.toRawMessage(connectionId: ConnectionID, direction: Dire
         startLine.writeTo(this)
         headers.writeTo(this)
         body.ifPresent { it.writeTo(this) }
-        toRawMessage(connectionId, direction, sequence, metadataProperties, parentEventId)
+        toRawMessage(connectionId, direction, sequence, metadataProperties, bookName, parentEventId)
     }
 }
 
-fun RawHttpRequest.toRawMessage(connectionId: ConnectionID, sequence: Long): RawMessage.Builder = toRawMessage(connectionId, SECOND, sequence, this)
-fun RawHttpResponse<*>.toRawMessage(connectionId: ConnectionID, sequence: Long, request: RawHttpRequest): RawMessage.Builder = toRawMessage(connectionId, FIRST, sequence, request)
+fun RawHttpRequest.toRawMessage(connectionId: ConnectionID, sequence: Long, bookName: String): RawMessage.Builder = toRawMessage(connectionId, SECOND, sequence, bookName, this)
+fun RawHttpResponse<*>.toRawMessage(connectionId: ConnectionID, sequence: Long, bookName: String, request: RawHttpRequest): RawMessage.Builder = toRawMessage(connectionId, FIRST, sequence, bookName, request)
 
 val MessageGroup.eventIds: Sequence<String>
     get() = messagesList.asSequence()

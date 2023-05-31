@@ -41,6 +41,7 @@ import java.time.Instant
 class RequestPropertiesPassthroughTest {
     companion object {
         private const val serverPort = 8086
+        private const val BOOK_NAME = "bookName"
     }
 
     @Test
@@ -110,7 +111,7 @@ class RequestPropertiesPassthroughTest {
         )
         val connectionId = ConnectionID.newBuilder().setSessionAlias("testAlias").build()
 
-        val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
+        val messageGroup = response.toRawMessage(connectionId, 0L, BOOK_NAME, request).toBatch()
 
         request = messageGroup.getGroups(0).toRequest()
 

@@ -35,7 +35,7 @@ class CommonTests {
         val requestLine =  RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
         val request = Th2RawHttpRequest(requestLine, RawHttpHeaders.CONTENT_LENGTH_ZERO, null, null, parentEventID, metadata)
 
-        val rawMessage = request.toRawMessage(ConnectionID.getDefaultInstance(), 12345L)
+        val rawMessage = request.toRawMessage(ConnectionID.getDefaultInstance(), 12345L, BOOK_NAME)
         val newMetadata = rawMessage.metadata.propertiesMap
         Assertions.assertEquals(metadata.values.size + 2 /* method and uri */, newMetadata.values.size)
         metadata.forEach {
@@ -43,5 +43,9 @@ class CommonTests {
             Assertions.assertEquals(it.value, newMetadata[it.key])
         }
         Assertions.assertEquals(parentEventID, rawMessage.parentEventId.id)
+    }
+
+    companion object {
+        private const val BOOK_NAME = "bookName"
     }
 }
