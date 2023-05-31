@@ -51,6 +51,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import mu.KotlinLogging
 import rawhttp.core.RawHttpRequest
@@ -96,7 +97,7 @@ fun main(args: Array<String>) = try {
     }.apply { resources += "factory" to ::close }
 
     val mapper = JsonMapper.builder()
-        .addModule(KotlinModule(nullIsSameAsDefault = true))
+        .addModule(KotlinModule.Builder().configure(KotlinFeature.NullIsSameAsDefault, true).build())
         .addModule(SimpleModule().addDeserializer(IAuthSettings::class.java, AuthSettingsDeserializer(authSettingsType)))
         .build()
 
@@ -104,7 +105,7 @@ fun main(args: Array<String>) = try {
     val eventRouter = factory.eventBatchRouter
     val messageRouter = factory.messageRouterMessageGroupBatch
 
-    run(settings, eventRouter, messageRouter, stateManager, requestHandler, factory.rootEventId) { resource, destructor ->
+    run(settings, eventRouter, messageRouter, stateManager, requestHandler, factory.rootEventId, factory.boxConfiguration.bookName) { resource, destructor ->
         resources += resource to destructor
     }
 } catch (e: Exception) {
@@ -119,6 +120,7 @@ fun run(
     stateManager: IStateManager,
     requestHandler: IRequestHandler,
     rootEventId: EventID,
+    bookName: String,
     registerResource: (name: String, destructor: () -> Unit) -> Unit,
 ) {
     val connectionId = ConnectionID.newBuilder().setSessionAlias(settings.sessionAlias).build()
@@ -127,7 +129,7 @@ fun run(
     val outgoingSequence = createSequence()
 
     val onRequest: (RawHttpRequest) -> Unit = { request: RawHttpRequest ->
-        val rawMessage = request.toRawMessage(connectionId, outgoingSequence())
+        val rawMessage = request.toRawMessage(connectionId, outgoingSequence(), bookName)
 
         messageRouter.send(rawMessage.toBatch(), SECOND.toString())
         eventRouter.storeEvent(
@@ -139,7 +141,7 @@ fun run(
     }
 
     val onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-        messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), request).toBatch(), FIRST.toString())
+        messageRouter.send(response.toRawMessage(connectionId, incomingSequence(), bookName, request).toBatch(), FIRST.toString())
         stateManager.onResponse(response)
     }
 
@@ -253,23 +255,6 @@ private inline fun <reified T> load(defaultImpl: Class<out T>): T {
 private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
-
-private fun MessageRouter<EventBatch>.storeEvent(name: String, eventId: String, messageId: MessageID) : String {
-    val type = "Info"
-    val status = Event.Status.PASSED
-    val event = Event.start().apply {
-        endTimestamp()
-        name(name)
-        type(type)
-        status(status)
-
-        messageID(messageId)
-    }
-
-    storeEvent(event, eventId)
-
-    return event.id
-}
 
 private fun createExecutorService(maxCount: Int) : ExecutorService {
     val threadCount = AtomicInteger(1)
