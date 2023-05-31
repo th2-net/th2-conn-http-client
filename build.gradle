@@ -163,15 +163,16 @@ clean {
 dependencies {
     api platform('com.exactpro.th2:bom:4.2.0')
 
-    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5111091854-6528835-SNAPSHOT'
+    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5135573491-2a715a8-SNAPSHOT'
+    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5135584406-a5ab616-SNAPSHOT'
     implementation 'org.slf4j:slf4j-api'
 
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: kotlin_version
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect', version: kotlin_version
     implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
     implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
+    implementation group: 'io.netty', name: 'netty-buffer'
     implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
-
 
     testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5', version: kotlin_version
     testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'

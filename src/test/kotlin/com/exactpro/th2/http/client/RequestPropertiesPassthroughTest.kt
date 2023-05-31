@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,13 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.common.grpc.AnyMessage
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.toTimestamp
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.toBatch
-import com.exactpro.th2.http.client.util.toRawMessage
+import com.exactpro.th2.http.client.util.toProtoMessage
 import com.exactpro.th2.http.client.util.toRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -45,11 +46,11 @@ class RequestPropertiesPassthroughTest {
 
     @Test
     fun `Request id and properties test`() {
-        val parentEventId = "123"
+        val parentEventId = EventID.newBuilder().setId("123").build()
         val metadataProperties = mapOf("abc" to "cde")
 
         val message = RawMessage.newBuilder().apply {
-            this.parentEventIdBuilder.id = parentEventId
+            this.parentEventId = parentEventId
             this.metadataBuilder.apply {
                 putAllProperties(metadataProperties)
                 this.idBuilder.apply {
@@ -62,7 +63,8 @@ class RequestPropertiesPassthroughTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+        val request =
+            MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
                 .toRequest()
                 .withRequestLine(requestLine)
                 .withBody(null)
@@ -78,11 +80,11 @@ class RequestPropertiesPassthroughTest {
 
     @Test
     fun `RawMessage to Request, to Response data, check id or properties loss`() {
-        val parentEventId = "123"
+        val parentEventId = EventID.newBuilder().setId("123").build()
         val metadataProperties = mapOf("abc" to "cde")
 
         val message = RawMessage.newBuilder().apply {
-            this.parentEventIdBuilder.id = parentEventId
+            this.parentEventId = parentEventId
             this.metadataBuilder.apply {
                 putAllProperties(metadataProperties)
                 this.idBuilder.apply {
@@ -95,7 +97,8 @@ class RequestPropertiesPassthroughTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        var request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+        var request =
+            MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
                 .toRequest()
                 .withRequestLine(requestLine)
                 .withBody(null)
@@ -110,7 +113,7 @@ class RequestPropertiesPassthroughTest {
         )
         val connectionId = ConnectionID.newBuilder().setSessionAlias("testAlias").build()
 
-        val messageGroup = response.toRawMessage(connectionId, 0L, request).toBatch()
+        val messageGroup = response.toProtoMessage(connectionId, 0L, request).toBatch()
 
         request = messageGroup.getGroups(0).toRequest()
 
@@ -141,11 +144,12 @@ class RequestPropertiesPassthroughTest {
         }.build()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1).withHost("localhost:$serverPort")
-        val request = MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
-            .toRequest()
-            .withRequestLine(requestLine)
-            .withBody(null)
-            .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
+        val request =
+            MessageGroup.newBuilder().addMessages(AnyMessage.newBuilder().setRawMessage(message).build()).build()
+                .toRequest()
+                .withRequestLine(requestLine)
+                .withBody(null)
+                .withHeaders(RawHttpHeaders.CONTENT_LENGTH_ZERO)
 
         val header = RawHttpHeaders.newBuilder()
             .with("first", "10")

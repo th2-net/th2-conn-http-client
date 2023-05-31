@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.Direction
 import com.exactpro.th2.common.grpc.Direction.FIRST
 import com.exactpro.th2.common.grpc.Direction.SECOND
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.Message
 import com.exactpro.th2.common.grpc.MessageGroup
 import com.exactpro.th2.common.grpc.MessageGroupBatch
@@ -30,11 +31,14 @@ import com.exactpro.th2.common.grpc.RawMessage
 import com.exactpro.th2.common.message.getList
 import com.exactpro.th2.common.message.getString
 import com.exactpro.th2.common.message.toTimestamp
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.transport
+import com.exactpro.th2.common.utils.event.toTransport
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder
 import com.google.protobuf.util.JsonFormat
+import io.netty.buffer.Unpooled
 import rawhttp.core.HttpMessage
 import rawhttp.core.HttpVersion.HTTP_1_1
 import rawhttp.core.RawHttpHeaders
@@ -45,6 +49,7 @@ import rawhttp.core.body.BytesBody
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.time.Instant
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.RawMessage as TransportRawMessage
 
 private const val REQUEST_MESSAGE = "Request"
 
@@ -77,8 +82,10 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
     head.getList(HEADERS_FIELD)?.forEach {
         require(it.hasMessageValue()) { "Item of '$HEADERS_FIELD' field list is not a message: ${it.toPrettyString()}" }
         val message = it.messageValue
-        val name = message.getString(HEADER_NAME_FIELD) ?: error("Header message has no $HEADER_NAME_FIELD field: ${message.toPrettyString()}")
-        val value = message.getString(HEADER_VALUE_FIELD) ?: error("Header message has no $HEADER_VALUE_FIELD field: ${message.toPrettyString()}")
+        val name = message.getString(HEADER_NAME_FIELD)
+            ?: error("Header message has no $HEADER_NAME_FIELD field: ${message.toPrettyString()}")
+        val value = message.getString(HEADER_VALUE_FIELD)
+            ?: error("Header message has no $HEADER_VALUE_FIELD field: ${message.toPrettyString()}")
         httpHeaders.with(name, value)
     }
 
@@ -98,7 +105,7 @@ private fun createRequest(head: Message, body: RawMessage): RawHttpRequest {
         BytesBody(this).toBodyReader().eager()
     }
 
-    val parentEventId = head.parentEventId.id.ifEmpty { body.parentEventId.id }
+    val parentEventId = if (head.hasParentEventId()) head.parentEventId else body.parentEventId
     val metadataProperties = body.metadata.propertiesMap + head.metadata.propertiesMap
 
     metadataProperties.forEach { (name, value) ->
@@ -132,31 +139,34 @@ fun MessageGroup.toRequest(): RawHttpRequest = when (messagesCount) {
             else -> error("Single message in group is neither parsed nor raw: ${toPrettyString()}")
         }
     }
+
     2 -> {
         val head = getMessages(0).toParsed("Head").requireType(REQUEST_MESSAGE)
         val body = getMessages(1).toRaw("Body")
         createRequest(head, body)
     }
+
     else -> error("Message group contains more than 2 messages")
 }
 
 private inline operator fun <T : Builder> T.invoke(block: T.() -> Unit) = apply(block)
 
-fun MessageOrBuilder.toPrettyString(): String = JsonFormat.printer().omittingInsignificantWhitespace().includingDefaultValueFields().print(this)
+fun MessageOrBuilder.toPrettyString(): String =
+    JsonFormat.printer().omittingInsignificantWhitespace().includingDefaultValueFields().print(this)
 
-fun RawMessage.Builder.toBatch() = run(AnyMessage.newBuilder()::setRawMessage)
+fun RawMessage.Builder.toBatch(): MessageGroupBatch = run(AnyMessage.newBuilder()::setRawMessage)
     .run(MessageGroup.newBuilder()::addMessages)
     .run(MessageGroupBatch.newBuilder()::addGroups)
     .build()
 
-private fun ByteArrayOutputStream.toRawMessage(
+private fun ByteArrayOutputStream.toProtoMessage(
     connectionId: ConnectionID,
     direction: Direction,
     sequence: Long,
     metadataProperties: Map<String, String>,
-    parentEventId: String? = null
+    parentEventId: EventID? = null
 ) = RawMessage.newBuilder().apply {
-    parentEventId?.let(parentEventIdBuilder::setId)
+    parentEventId?.let(this::setParentEventId)
     this.body = ByteString.copyFrom(toByteArray())
     this.metadataBuilder {
         putAllProperties(metadataProperties)
@@ -169,29 +179,95 @@ private fun ByteArrayOutputStream.toRawMessage(
     }
 }
 
-private fun HttpMessage.toRawMessage(connectionId: ConnectionID, direction: Direction, sequence: Long, request: RawHttpRequest): RawMessage.Builder {
-    val (metadataProperties, parentEventId) = when (request) {
-        is Th2RawHttpRequest -> request.metadataProperties.toMutableMap() to request.parentEventId
-        else -> mutableMapOf<String, String>() to null
+private fun ByteArrayOutputStream.toTransportMessage(
+    sessionAlias: String,
+    direction: Direction,
+    sequence: Long,
+    metadataProperties: Map<String, String>,
+    parentEventId: EventID? = null
+): TransportRawMessage.Builder = TransportRawMessage.builder().apply {
+    parentEventId?.let {
+        setEventId(parentEventId.toTransport())
     }
-
-    metadataProperties[METHOD_PROPERTY] = request.method
-    metadataProperties[URI_PROPERTY] = request.uri.toString()
-
-    if (CONTENT_TYPE_HEADER in headers) {
-        metadataProperties[CONTENT_TYPE_PROPERTY] = headers[CONTENT_TYPE_HEADER].joinToString(HEADER_VALUE_SEPARATOR)
-    }
-
-    return ByteArrayOutputStream().run {
-        startLine.writeTo(this)
-        headers.writeTo(this)
-        body.ifPresent { it.writeTo(this) }
-        toRawMessage(connectionId, direction, sequence, metadataProperties, parentEventId)
+    setBody(Unpooled.wrappedBuffer(toByteArray()))
+    setMetadata(metadataProperties)
+    idBuilder().apply {
+        setSessionAlias(sessionAlias)
+        setDirection(direction.transport)
+        setSequence(sequence)
+        setTimestamp(Instant.now())
     }
 }
 
-fun RawHttpRequest.toRawMessage(connectionId: ConnectionID, sequence: Long): RawMessage.Builder = toRawMessage(connectionId, SECOND, sequence, this)
-fun RawHttpResponse<*>.toRawMessage(connectionId: ConnectionID, sequence: Long, request: RawHttpRequest): RawMessage.Builder = toRawMessage(connectionId, FIRST, sequence, request)
+private val RawHttpRequest.parentEventId: EventID?
+    get() = when (this) {
+        is Th2RawHttpRequest -> parentEventId
+        else -> null
+    }
+
+private fun HttpMessage.toByteArrayOutputStream(): ByteArrayOutputStream {
+    return ByteArrayOutputStream().apply {
+        startLine.writeTo(this)
+        headers.writeTo(this)
+        body.ifPresent { it.writeTo(this) }
+    }
+}
+
+private fun RawHttpRequest.toProperties(): Map<String, String> = when (this) {
+    is Th2RawHttpRequest -> metadataProperties.toMutableMap()
+    else -> hashMapOf()
+}.apply {
+    put(METHOD_PROPERTY, method)
+    put(URI_PROPERTY, uri.toString())
+
+    if (CONTENT_TYPE_HEADER in headers) {
+        put(CONTENT_TYPE_PROPERTY, headers[CONTENT_TYPE_HEADER].joinToString(HEADER_VALUE_SEPARATOR))
+    }
+}
+
+private fun HttpMessage.toProtoMessage(
+    connectionId: ConnectionID,
+    direction: Direction,
+    sequence: Long,
+    request: RawHttpRequest
+): RawMessage.Builder = toByteArrayOutputStream().toProtoMessage(
+    connectionId,
+    direction,
+    sequence,
+    request.toProperties(),
+    request.parentEventId
+)
+
+fun RawHttpRequest.toProtoMessage(connectionId: ConnectionID, sequence: Long): RawMessage.Builder =
+    toProtoMessage(connectionId, SECOND, sequence, this)
+
+fun RawHttpResponse<*>.toProtoMessage(
+    connectionId: ConnectionID,
+    sequence: Long,
+    request: RawHttpRequest
+): RawMessage.Builder = toProtoMessage(connectionId, FIRST, sequence, request)
+
+private fun HttpMessage.toTransportMessage(
+    sessionAlias: String,
+    direction: Direction,
+    sequence: Long,
+    request: RawHttpRequest
+): TransportRawMessage.Builder = toByteArrayOutputStream().toTransportMessage(
+    sessionAlias,
+    direction,
+    sequence,
+    request.toProperties(),
+    request.parentEventId
+)
+
+fun RawHttpRequest.toTransportMessage(sessionAlias: String, sequence: Long): TransportRawMessage.Builder =
+    toTransportMessage(sessionAlias, SECOND, sequence, this)
+
+fun RawHttpResponse<*>.toTransportMessage(
+    sessionAlias: String,
+    sequence: Long,
+    request: RawHttpRequest
+): TransportRawMessage.Builder = toTransportMessage(sessionAlias, FIRST, sequence, request)
 
 val MessageGroup.eventIds: Sequence<String>
     get() = messagesList.asSequence()
