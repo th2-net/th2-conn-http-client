@@ -70,7 +70,7 @@ import rawhttp.core.RawHttpResponse
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
 import java.time.Instant
-import java.util.*
+import java.util.ServiceLoader
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

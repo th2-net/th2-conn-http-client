@@ -43,7 +43,6 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite.Builder
 import com.google.protobuf.MessageOrBuilder
 import com.google.protobuf.util.JsonFormat
-import io.netty.buffer.Unpooled
 import rawhttp.core.HttpMessage
 import rawhttp.core.HttpVersion.HTTP_1_1
 import rawhttp.core.RawHttpHeaders
@@ -281,7 +280,7 @@ private fun ByteArrayOutputStream.toTransportMessage(
     parentEventId?.let {
         setEventId(parentEventId.toTransport())
     }
-    setBody(Unpooled.wrappedBuffer(toByteArray()))
+    setBody(toByteArray())
     setMetadata(metadataProperties)
     idBuilder().apply {
         setSessionAlias(sessionAlias)

@@ -33,7 +33,7 @@ import rawhttp.core.RequestLine
 import rawhttp.core.body.BytesBody
 import rawhttp.core.server.TcpRawHttpServer
 import java.net.URI
-import java.util.*
+import java.util.Optional
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
