@@ -20,6 +20,11 @@ Main configuration is done via setting following properties in a custom configur
   are not affected, empty by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (`null` by default)
++ **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`false` by default)
++ **batchByGroup** - batch messages by group instead of session alias and direction (`true` by default)
++ **batcherThreads** - amount of event/message batcher threads (`2` by default)
++ **maxBatchSize** - max size of outgoing message batch (`1000` by default)
++ **maxFlushTime** - max message batch flush time (`1000` by default)
 
 ### Authentication configuration
 
@@ -49,8 +54,33 @@ auth:
 
 ### MQ pins
 
-* input queue with `subscribe` and `send` attributes for requests
-* output queue with `publish` and `first` (for responses) and `second` (for requests) attributes
+#### input pins
+
+* pin with `subscribe` and `send` attributes for requests using protobuf
+* pin with `subscribe`, `send` and `transport-group` attributes for requests using th2 transport
+
+Note: least one of pins above is required, it's mean that conn can handle messages via one or both protocols at the same
+time
+
+#### output pins
+
+Required output pins set depends on values of the `useTransport` and `batchByGroup` options
+
+`useTransport` option is `true` and `batchByGroup` option is `true`
+
+* output queue with `publish`, `transport-group` attributes for transport group batch with responses and requests
+
+`useTransport` option is `true` and `batchByGroup` option is `false`
+
+* output queue with `publish`, `transport-group` and `first` (for responses) and `second` (for requests) attributes
+
+`useTransport` option is `false` and `batchByGroup` option is `true`
+
+* output queue with `publish`, `raw` attributes for transport group batch with responses and requests
+
+`useTransport` option is `false` and `batchByGroup` option is `false`
+
+* output queue with `publish`, `raw` and `first` (for responses) and `second` (for requests) attributes
 
 ## Inputs/outputs
 
@@ -58,14 +88,16 @@ This section describes messages received and by produced by the service
 
 ### Inputs
 
-This service receives HTTP requests via MQ as `MessageGroup`s containing one of:
+This service receives HTTP requests via MQ as `transport message group`s containing one of:
 
-* a single `RawMessage` containing request body, which can have `uri`, `method`, and `contentType` properties in its
+* a single `raw message` containing request body, which can have `uri`, `method`, and `contentType` properties in its
   metadata, which will be used in resulting request
-* a single `Message` with `Request` message type containing HTTP request line and headers and a `RawMessage` described
+* a single parsed message with `Request` message type containing HTTP request line and headers and a `RawMessage`
+  described
   above
 
-If both `Message` and `RawMessage` contain `uri`, `method`, and `contentType`, values from `Message` take precedence.  
+If both `parsed` and `raw` messages contain `uri`, `method`, and `contentType`, values from `parsed` message take
+precedence.  
 If none of them contain these values `/` and `GET` will be used as `uri` and `method` values respectively
 
 #### Message descriptions
@@ -90,9 +122,10 @@ prefix removed
 
 ### Outputs
 
-HTTP requests and responses are sent via MQ as `MessageGroup`s containing a single `RawMessage` with a raw request or
+HTTP requests and responses are sent via MQ as `transport message group`s containing a single `raw` message with a raw
+request or
 response.   
-`RawMessage` also has `uri`, `method`, and `contentType` metadata properties set equal to URI, method, and content type
+`raw` message also has `uri`, `method`, and `contentType` metadata properties set equal to URI, method, and content type
 of request (or a response received for the request). In case of response request metadata properties and parent event id
 are copied into response message.
 
@@ -118,6 +151,11 @@ spec:
     validateCertificates: true
     clientCertificate: /secret/storage/cert.crt
     certificatePrivateKey: /secret/storage/private.key
+    useTransport: false
+    batchByGroup: true
+    batcherThreads: 2
+    maxBatchSize: 1000
+    maxFlushTime: 1000
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
     auth:
@@ -125,23 +163,22 @@ spec:
       password: pwds
   type: th2-conn
   pins:
-    - name: to_send
+    - name: to_send_protobuf
       connection-type: mq
       attributes:
         - subscribe
         - send
         - group
-    - name: out_request
+    - name: to_send_transport
+      connection-type: mq
+      attributes:
+        - subscribe
+        - send
+        - transport-group
+    - name: out_group_request
       connection-type: mq
       attributes:
         - publish
-        - second
-        - raw
-    - name: out_response
-      connection-type: mq
-      attributes:
-        - publish
-        - first
         - raw
   extended-settings:
     service:
@@ -151,6 +188,10 @@ spec:
 ## Changelog
 
 ### v0.9.0
+
+* Supports th2 transport protocol
+* Use event / message batcher
+    * Support batching by session group or session alias + direction
 
 * kotlin upgrade to `1.6.21`
 * owasp upgrade to `8.2.1`

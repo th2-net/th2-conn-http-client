@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.util.toRequest
 import com.google.auto.service.AutoService
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup as TransportMessageGroup
 
 @AutoService(IRequestHandler::class)
 class BasicRequestHandler : IRequestHandler {
@@ -33,6 +34,10 @@ class BasicRequestHandler : IRequestHandler {
     }
 
     override fun onRequest(request: MessageGroup) {
+        client.send(request.toRequest())
+    }
+
+    override fun onRequest(request: TransportMessageGroup) {
         client.send(request.toRequest())
     }
 

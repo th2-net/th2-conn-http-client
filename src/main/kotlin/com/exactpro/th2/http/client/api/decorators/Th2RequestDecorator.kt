@@ -30,7 +30,7 @@ class Th2RawHttpRequest(
     headers: RawHttpHeaders,
     bodyReader: BodyReader?,
     senderAddress: InetAddress?,
-    val parentEventId: EventID,
+    val parentEventId: EventID?,
     val metadataProperties: Map<String, String>
 ) : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
 

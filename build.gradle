@@ -163,8 +163,8 @@ clean {
 dependencies {
     api platform('com.exactpro.th2:bom:4.2.0')
 
-    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5135573491-2a715a8-SNAPSHOT'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5135584406-a5ab616-SNAPSHOT'
+    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5144283961-5ae02cd-SNAPSHOT'
+    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5144338850-92237a3-SNAPSHOT'
     implementation 'org.slf4j:slf4j-api'
 
     implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8', version: kotlin_version

@@ -26,6 +26,7 @@ import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.QueueAttribute.RAW
+import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.EventId
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.proto
 import com.exactpro.th2.common.utils.event.EventBatcher
@@ -35,9 +36,11 @@ import com.exactpro.th2.common.utils.message.RAW_DIRECTION_SELECTOR
 import com.exactpro.th2.common.utils.message.RAW_GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
 import com.exactpro.th2.common.utils.message.direction
+import com.exactpro.th2.common.utils.message.parentEventIds
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher.Companion.ALIAS_SELECTOR
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher.Companion.GROUP_SELECTOR
+import com.exactpro.th2.common.utils.message.transport.eventIds
 import com.exactpro.th2.common.utils.shutdownGracefully
 import com.exactpro.th2.http.client.api.IAuthSettings
 import com.exactpro.th2.http.client.api.IAuthSettingsTypeProvider
@@ -52,7 +55,6 @@ import com.exactpro.th2.http.client.api.impl.BasicStateManager
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.CertificateConverter
 import com.exactpro.th2.http.client.util.PrivateKeyConverter
-import com.exactpro.th2.http.client.util.eventIds
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toProtoMessage
 import com.exactpro.th2.http.client.util.toTransportMessage
@@ -268,32 +270,58 @@ fun run(
 
         val sendService: ExecutorService = createExecutorService(maxParallelRequests)
 
-        val listener = MessageListener<MessageGroupBatch> { _, message ->
-            message.groupsList.forEach { group ->
-                sendService.submit {
-                    group.runCatching(requestHandler::onRequest).recoverCatching { error ->
-                        LOGGER.error(error) { "Failed to handle message group: ${group.toPrettyString()}" }
-                        group.eventIds
-                            .ifEmpty { sequenceOf(rootEventId) }
-                            .forEach {
+        val proto = runCatching {
+            val listener = MessageListener<MessageGroupBatch> { _, message ->
+                message.groupsList.forEach { group ->
+                    sendService.submit {
+                        group.runCatching(requestHandler::onRequest).recoverCatching { error ->
+                            LOGGER.error(error) { "Failed to handle protobuf message group: ${group.toPrettyString()}" }
+                            group.parentEventIds.ifEmpty { sequenceOf(rootEventId) }.forEach {
                                 eventBatcher.storeEvent(
-                                    it as EventID,
-                                    "Failed to handle message group",
+                                    it,
+                                    "Failed to handle protobuf message group",
                                     "Error",
                                     error
                                 )
                             }
+                        }
                     }
                 }
             }
-        }
-
-        runCatching {
             checkNotNull(protoMR.subscribe(listener, INPUT_QUEUE_ATTRIBUTE))
         }.onSuccess { monitor ->
-            registerResource("raw-monitor", monitor::unsubscribe)
+            registerResource("proto-raw-monitor", monitor::unsubscribe)
         }.onFailure {
-            throw IllegalStateException("Failed to subscribe to input queue", it)
+            LOGGER.warn(it) { "Failed to subscribe to input protobuf queue" }
+        }
+
+        val transport = runCatching {
+            val listener = MessageListener<GroupBatch> { _, message ->
+                message.groups.forEach { group ->
+                    sendService.submit {
+                        group.runCatching(requestHandler::onRequest).recoverCatching { error ->
+                            LOGGER.error(error) { "Failed to handle transport message group: $group" }
+                            group.eventIds.map(EventId::toProto).ifEmpty { sequenceOf(rootEventId) }.forEach {
+                                eventBatcher.storeEvent(
+                                    it,
+                                    "Failed to handle transport message group",
+                                    "Error",
+                                    error
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            checkNotNull(transportMR.subscribe(listener, INPUT_QUEUE_ATTRIBUTE))
+        }.onSuccess { monitor ->
+            registerResource("transport-raw-monitor", monitor::unsubscribe)
+        }.onFailure {
+            LOGGER.warn(it) { "Failed to subscribe to input transport queue" }
+        }
+
+        if (proto.isFailure && transport.isFailure) {
+            error("Subscribe pin should be declared at least one of protobuf or transport protocols")
         }
 
         client.runCatching(HttpClient::start).onFailure {
@@ -324,10 +352,10 @@ data class Settings(
     val auth: IAuthSettings? = null,
     val validateCertificates: Boolean = true,
     val useTransport: Boolean = false,
+    val batchByGroup: Boolean = true,
     val batcherThreads: Int = 2,
     val maxBatchSize: Int = 1000,
     val maxFlushTime: Long = 1000,
-    val batchByGroup: Boolean = true,
     @JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
     @JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
 ) {
