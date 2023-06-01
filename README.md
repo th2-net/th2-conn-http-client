@@ -1,4 +1,4 @@
-# HTTP Client v0.9.0
+# HTTP Client v2.1.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -187,16 +187,21 @@ spec:
 
 ## Changelog
 
-### v0.9.0
+### v2.1.0
 
 * Supports th2 transport protocol
 * Use event / message batcher
     * Support batching by session group or session alias + direction
 
-* kotlin upgrade to `1.6.21`
 * owasp upgrade to `8.2.1`
-* th2-bom upgrade to `4.2.0`
 * th2-common upgrade to `5.3.0`
+
+### v2.0.0
+* books and pages support
+* owasp plugin check
+* kotlin upgrade to `1.6.21`
+* th2-common upgrade to `5.2.0`
+* th2-bom upgrade to `4.2.0`
 
 ### v0.8.0
 

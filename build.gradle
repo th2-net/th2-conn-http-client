@@ -216,9 +216,13 @@ test {
     useJUnitPlatform()
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencyCheck {
-    formats = ['SARIF', 'JSON', 'HTML']
-    failBuildOnCVSS = 5
+    formats=['SARIF', 'JSON', 'HTML']
+    failBuildOnCVSS=5
 
     analyzers {
         assemblyEnabled = false
