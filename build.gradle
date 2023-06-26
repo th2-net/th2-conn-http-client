@@ -149,8 +149,8 @@ nexusPublishing {
 }
 
 signing {
-    def signingKey = findProperty("signingKey")
-    def signingPassword = findProperty("signingPassword")
+    String signingKey = findProperty("signingKey")
+    String signingPassword = findProperty("signingPassword")
     useInMemoryPgpKeys(signingKey, signingPassword)
     sign publishing.publications.mavenJava
 }
@@ -161,21 +161,26 @@ clean {
 
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.2.0')
+    api platform('com.exactpro.th2:bom:4.4.0-update-libs-5345334944-c71fdc9-SNAPSHOT')
 
-    implementation 'com.exactpro.th2:common:5.3.0-json-raw-body-5146306196-dadcaea-SNAPSHOT'
-    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5144338850-92237a3-SNAPSHOT'
+    implementation('com.exactpro.th2:common:5.3.0-separate-executor-5347518176-63bc4ea-SNAPSHOT') {
+        exclude group: 'com.exactpro.th2', module: 'cradle-core'
+        exclude group: 'com.exactpro.th2', module: 'cradle-cassandra'
+    }
+    implementation 'com.exactpro.th2:common-utils:2.1.0-transport-protocol-5347774882-e4aa8e6-SNAPSHOT'
     implementation 'org.slf4j:slf4j-api'
 
     implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
-    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
+    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin'
+
+    implementation 'io.github.microutils:kotlin-logging:3.0.0' // The last version bases on kotlin 1.6.0
 
     testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5', version: kotlin_version
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
 
-    compileOnly 'com.google.auto.service:auto-service:1.0.1'
-    annotationProcessor 'com.google.auto.service:auto-service:1.0.1'
-    kapt 'com.google.auto.service:auto-service:1.0.1'
+    compileOnly 'com.google.auto.service:auto-service:1.1.1'
+    annotationProcessor 'com.google.auto.service:auto-service:1.1.1'
+    kapt 'com.google.auto.service:auto-service:1.1.1'
 }
 
 application {
