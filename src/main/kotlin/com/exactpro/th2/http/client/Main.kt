@@ -102,7 +102,9 @@ fun main(args: Array<String>) = try {
     val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
     val authSettingsType = load<IAuthSettingsTypeProvider>(BasicAuthSettingsTypeProvider::class.java).type
 
-    val factory = args.runCatching(CommonFactory::createFromArguments).getOrElse {
+    val factory = runCatching {
+        CommonFactory.createFromArguments(*args)
+    }.getOrElse {
         LOGGER.error(it) { "Failed to create common factory with arguments: ${args.joinToString(" ")}" }
         CommonFactory()
     }.apply { resources += "factory" to ::close }
