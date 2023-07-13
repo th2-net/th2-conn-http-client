@@ -50,7 +50,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.SingletonSupport
 import mu.KotlinLogging
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -89,13 +91,22 @@ fun main(args: Array<String>) = try {
     val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
     val authSettingsType = load<IAuthSettingsTypeProvider>(BasicAuthSettingsTypeProvider::class.java).type
 
-    val factory = args.runCatching(CommonFactory::createFromArguments).getOrElse {
+    val factory = args.runCatching { CommonFactory.createFromArguments(*args) }.getOrElse {
         LOGGER.error(it) { "Failed to create common factory with arguments: ${args.joinToString(" ")}" }
         CommonFactory()
     }.apply { resources += "factory" to ::close }
 
     val mapper = JsonMapper.builder()
-        .addModule(KotlinModule(nullIsSameAsDefault = true))
+        .addModule(
+            KotlinModule.Builder()
+                .withReflectionCacheSize(512)
+                .configure(KotlinFeature.NullToEmptyCollection, false)
+                .configure(KotlinFeature.NullToEmptyMap, false)
+                .configure(KotlinFeature.NullIsSameAsDefault, enabled = true)
+                .configure(KotlinFeature.SingletonSupport, true)
+                .configure(KotlinFeature.StrictNullChecks, false)
+                .build()
+        )
         .addModule(SimpleModule().addDeserializer(IAuthSettings::class.java, AuthSettingsDeserializer(authSettingsType)))
         .build()
 

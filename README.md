@@ -1,4 +1,4 @@
-# HTTP Client v0.8.0
+# HTTP Client v0.8.1
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -99,7 +99,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.7.2
+  image-version: 0.8.1
   custom-config:
     https: false
     host: 127.0.0.1
@@ -141,6 +141,12 @@ spec:
 ```
 
 ## Changelog
+
+### v0.8.1
+
+#### Fixed:
+
++ Fix problem with exceeding the limit for sockets to acquire when and exception is thrown during that process.
 
 ### v0.8.0
 * Vulnerability check pipeline step
