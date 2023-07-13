@@ -205,10 +205,10 @@ fun run(
                 stateManager.onResponse(response)
             }
         } else {
-            val connectionId = ConnectionID.newBuilder().apply {
-                this.sessionGroup = sessionGroup
-                this.sessionAlias = sessionAlias
-            }.build()
+            val connectionId = ConnectionID.newBuilder()
+                .setSessionAlias(sessionAlias)
+                .setSessionGroup(sessionGroup)
+                .build()
 
             val messageBatcher = if (batchByGroup) {
                 RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
