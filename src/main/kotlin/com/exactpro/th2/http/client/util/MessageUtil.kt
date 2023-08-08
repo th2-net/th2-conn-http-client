@@ -57,7 +57,7 @@ import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Message as
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.MessageGroup as TransportMessageGroup
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.RawMessage as TransportRawMessage
 
-private const val REQUEST_MESSAGE = "Request"
+internal const val REQUEST_MESSAGE = "Request"
 
 private const val METHOD_FIELD = "method"
 private const val URI_FIELD = "uri"
@@ -126,10 +126,10 @@ private fun AnyMessage.toRaw(name: String): RawMessage = run {
     rawMessage
 }
 
-private inline fun <reified T : TransportMessage<*>> TransportMessage<*>.cast(name: String): T =
+internal inline fun <reified T : TransportMessage<*>> TransportMessage<*>.cast(name: String): T =
     with(T::class.javaObjectType) {
         require(isInstance(this@cast)) { "$name is not a parsed message: $this" }
-        cast(this)
+        cast(this@cast)
     }
 
 fun MessageGroup.toRequest(): RawHttpRequest = when (messagesCount) {
