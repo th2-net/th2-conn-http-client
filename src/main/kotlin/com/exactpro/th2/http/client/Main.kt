@@ -83,7 +83,9 @@ import kotlin.concurrent.withLock
 import kotlin.system.exitProcess
 
 private val LOGGER = KotlinLogging.logger { }
-private const val INPUT_QUEUE_ATTRIBUTE = "send"
+private const val SEND_PIN_ATTRIBUTE = "send"
+private const val INPUT_QUEUE_TRANSPORT_ATTRIBUTE = SEND_PIN_ATTRIBUTE
+private val INPUT_QUEUE_PROTO_ATTRIBUTES = arrayOf(SEND_PIN_ATTRIBUTE, "group")
 
 fun main(args: Array<String>) = try {
     val resources = ConcurrentLinkedDeque<Pair<String, () -> Unit>>()
@@ -290,7 +292,7 @@ fun run(
                     }
                 }
             }
-            checkNotNull(protoMR.subscribe(listener, INPUT_QUEUE_ATTRIBUTE))
+            checkNotNull(protoMR.subscribe(listener, *INPUT_QUEUE_PROTO_ATTRIBUTES))
         }.onSuccess { monitor ->
             registerResource("proto-raw-monitor", monitor::unsubscribe)
         }.onFailure {
@@ -315,7 +317,7 @@ fun run(
                     }
                 }
             }
-            checkNotNull(transportMR.subscribe(listener, INPUT_QUEUE_ATTRIBUTE))
+            checkNotNull(transportMR.subscribe(listener, INPUT_QUEUE_TRANSPORT_ATTRIBUTE))
         }.onSuccess { monitor ->
             registerResource("transport-raw-monitor", monitor::unsubscribe)
         }.onFailure {

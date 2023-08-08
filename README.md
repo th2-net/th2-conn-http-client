@@ -56,7 +56,7 @@ auth:
 
 #### input pins
 
-* pin with `subscribe` and `send` attributes for requests using protobuf
+* pin with `subscribe`, `send` and `group` attributes for requests using protobuf
 * pin with `subscribe`, `send` and `transport-group` attributes for requests using th2 transport
 
 Note: least one of pins above is required, it's mean that conn can handle messages via one or both protocols at the same
