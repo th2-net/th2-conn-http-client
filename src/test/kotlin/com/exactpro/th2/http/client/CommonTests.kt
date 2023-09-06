@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@
 package com.exactpro.th2.http.client
 
 import com.exactpro.th2.common.grpc.ConnectionID
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
-import com.exactpro.th2.http.client.util.toRawMessage
+import com.exactpro.th2.http.client.util.toProtoMessage
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import rawhttp.core.HttpVersion
@@ -30,18 +31,19 @@ class CommonTests {
 
     @Test
     fun `parent event id loss test`() {
-        val parentEventID = "testParentId"
-        val metadata = mapOf( "propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
-        val requestLine =  RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
-        val request = Th2RawHttpRequest(requestLine, RawHttpHeaders.CONTENT_LENGTH_ZERO, null, null, parentEventID, metadata)
+        val parentEventID = EventID.newBuilder().setId("testParentId").build()
+        val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
+        val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
+        val request =
+            Th2RawHttpRequest(requestLine, RawHttpHeaders.CONTENT_LENGTH_ZERO, null, null, parentEventID, metadata)
 
-        val rawMessage = request.toRawMessage(ConnectionID.getDefaultInstance(), 12345L)
+        val rawMessage = request.toProtoMessage(ConnectionID.getDefaultInstance(), 12345L)
         val newMetadata = rawMessage.metadata.propertiesMap
         Assertions.assertEquals(metadata.values.size + 2 /* method and uri */, newMetadata.values.size)
         metadata.forEach {
             Assertions.assertTrue(newMetadata.containsKey(it.key))
             Assertions.assertEquals(it.value, newMetadata[it.key])
         }
-        Assertions.assertEquals(parentEventID, rawMessage.parentEventId.id)
+        Assertions.assertEquals(parentEventID, rawMessage.parentEventId)
     }
 }
