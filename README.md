@@ -20,8 +20,7 @@ Main configuration is done via setting following properties in a custom configur
   are not affected, empty by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (`null` by default)
-+ **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`false` by default)
-+ **batchByGroup** - batch messages by group instead of session alias and direction (`true` by default)
++ **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`true` by default)
 + **batcherThreads** - amount of event/message batcher threads (`2` by default)
 + **maxBatchSize** - max size of outgoing message batch (`1000` by default)
 + **maxFlushTime** - max message batch flush time (`1000` by default)
@@ -64,23 +63,15 @@ time
 
 #### output pins
 
-Required output pins set depends on values of the `useTransport` and `batchByGroup` options
+Required output pins set depends on values of the `useTransport` option
 
-`useTransport` option is `true` and `batchByGroup` option is `true`
+`useTransport` option is `true`
 
 * output queue with `publish`, `transport-group` attributes for transport group batch with responses and requests
 
-`useTransport` option is `true` and `batchByGroup` option is `false`
-
-* output queue with `publish`, `transport-group` and `first` (for responses) and `second` (for requests) attributes
-
-`useTransport` option is `false` and `batchByGroup` option is `true`
+`useTransport` option is `false`
 
 * output queue with `publish`, `raw` attributes for transport group batch with responses and requests
-
-`useTransport` option is `false` and `batchByGroup` option is `false`
-
-* output queue with `publish`, `raw` and `first` (for responses) and `second` (for requests) attributes
 
 ## Inputs/outputs
 
@@ -152,7 +143,6 @@ spec:
     clientCertificate: /secret/storage/cert.crt
     certificatePrivateKey: /secret/storage/private.key
     useTransport: false
-    batchByGroup: true
     batcherThreads: 2
     maxBatchSize: 1000
     maxFlushTime: 1000

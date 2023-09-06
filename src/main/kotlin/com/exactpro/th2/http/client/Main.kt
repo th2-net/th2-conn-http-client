@@ -28,17 +28,13 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.QueueAttribute.RAW
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.EventId
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
-import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.proto
 import com.exactpro.th2.common.utils.event.EventBatcher
 import com.exactpro.th2.common.utils.event.storeEvent
 import com.exactpro.th2.common.utils.event.transport.toProto
-import com.exactpro.th2.common.utils.message.RAW_DIRECTION_SELECTOR
 import com.exactpro.th2.common.utils.message.RAW_GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
-import com.exactpro.th2.common.utils.message.direction
 import com.exactpro.th2.common.utils.message.parentEventIds
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher
-import com.exactpro.th2.common.utils.message.transport.MessageBatcher.Companion.ALIAS_SELECTOR
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher.Companion.GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.transport.eventIds
 import com.exactpro.th2.common.utils.shutdownGracefully
@@ -181,13 +177,9 @@ fun run(
         }
 
         if (useTransport) {
-            val messageBatcher = if (batchByGroup) {
+            val messageBatcher =
                 MessageBatcher(maxBatchSize, maxFlushTime, book, GROUP_SELECTOR, executor, onError, transportMR::send)
-            } else {
-                MessageBatcher(maxBatchSize, maxFlushTime, book, ALIAS_SELECTOR, executor, onError) {
-                    transportMR.send(it, it.groups.first().messages.first().id.direction.proto.toString())
-                }
-            }.also { registerResource("transport message batcher", it::close) }
+                    .also { registerResource("transport message batcher", it::close) }
 
             onRequest = { request: RawHttpRequest ->
                 val rawMessage = request.toTransportMessage(sessionAlias, outgoingSequence())
@@ -212,14 +204,8 @@ fun run(
                 .setSessionGroup(sessionGroup)
                 .build()
 
-            val messageBatcher = if (batchByGroup) {
-                RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
-                    protoMR.send(it, RAW.value)
-                }
-            } else {
-                RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_DIRECTION_SELECTOR, executor, onError) {
-                    protoMR.send(it, RAW.value, it.getGroups(0).getMessages(0).direction.toString())
-                }
+            val messageBatcher = RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
+                protoMR.send(it, RAW.value)
             }.also { registerResource("proto message batcher", it::close) }
 
             onRequest = { request: RawHttpRequest ->
@@ -356,7 +342,6 @@ data class Settings(
     val auth: IAuthSettings? = null,
     val validateCertificates: Boolean = true,
     val useTransport: Boolean = false,
-    val batchByGroup: Boolean = true,
     val batcherThreads: Int = 2,
     val maxBatchSize: Int = 1000,
     val maxFlushTime: Long = 1000,
