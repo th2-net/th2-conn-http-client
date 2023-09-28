@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.http.client.api.decorators
 
+import com.exactpro.th2.common.event.EventUtils.generateUUID
 import com.exactpro.th2.common.grpc.EventID
 import rawhttp.core.EagerHttpRequest
 import rawhttp.core.RawHttpHeaders
@@ -24,6 +25,9 @@ import rawhttp.core.RequestLine
 import rawhttp.core.body.BodyReader
 import rawhttp.core.body.HttpMessageBody
 import java.net.InetAddress
+import java.time.Instant
+import java.util.concurrent.TimeUnit.SECONDS
+import java.util.concurrent.atomic.AtomicLong
 
 class Th2RawHttpRequest(
     requestLine: RequestLine,
@@ -31,8 +35,11 @@ class Th2RawHttpRequest(
     bodyReader: BodyReader?,
     senderAddress: InetAddress?,
     val parentEventId: EventID?,
-    val metadataProperties: Map<String, String>
+    val metadataProperties: Map<String, String>,
+    val th2RequestId: String = nextRequestId(),
 ) : RawHttpRequest(requestLine, headers, bodyReader, senderAddress) {
+
+
 
     override fun withBody(body: HttpMessageBody?, adjustHeaders: Boolean): Th2RawHttpRequest =
         withBody(body, adjustHeaders) { headers: RawHttpHeaders, bodyReader: BodyReader? ->
@@ -42,7 +49,8 @@ class Th2RawHttpRequest(
                 bodyReader,
                 senderAddress.orElse(null),
                 parentEventId,
-                metadataProperties
+                metadataProperties,
+                th2RequestId,
             )
         }
 
@@ -61,7 +69,8 @@ class Th2RawHttpRequest(
             body.orElse(null),
             senderAddress.orElse(null),
             parentEventId,
-            metadataProperties
+            metadataProperties,
+            th2RequestId,
         )
     }
 
@@ -73,13 +82,22 @@ class Th2RawHttpRequest(
         body.orElse(null),
         senderAddress.orElse(null),
         parentEventId,
-        metadataProperties
+        metadataProperties,
+        th2RequestId,
     )
 
     override fun eagerly(): EagerHttpRequest {
         throw UnsupportedOperationException("Unsupported eagerly call of request. It's client side, no need to eager request")
     }
 
+    companion object {
+        private val BASE_REQUEST_ID = generateUUID()
+        private val REQUEST_ID_COUNTER = Instant.now().run {
+            AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
+        }
+
+        private fun nextRequestId() = "$BASE_REQUEST_ID-${REQUEST_ID_COUNTER.incrementAndGet()}"
+    }
 }
 
 

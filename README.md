@@ -1,4 +1,4 @@
-# HTTP Client v2.1.0
+# HTTP Client v2.2.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -176,6 +176,10 @@ spec:
 ```
 
 ## Changelog
+
+### v2.2.0
+
+* Puts unique `th2-request-id` property to metadata of request/response messages 
 
 ### v2.1.0
 
