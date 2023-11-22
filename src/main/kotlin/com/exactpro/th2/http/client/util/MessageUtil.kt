@@ -66,7 +66,7 @@ private const val HEADER_NAME_FIELD = "name"
 private const val HEADER_VALUE_FIELD = "value"
 private const val HEADER_PREFIX = "header-"
 
-private const val TH2_REQUEST_ID_PROPERTY = "th2-request-id"
+internal const val TH2_REQUEST_ID_PROPERTY = "th2-request-id"
 private const val METHOD_PROPERTY = METHOD_FIELD
 private const val URI_PROPERTY = URI_FIELD
 private const val CONTENT_TYPE_PROPERTY = "contentType"

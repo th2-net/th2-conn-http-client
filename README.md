@@ -131,7 +131,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.8.1
+  image-version: 2.2.0-dev
   custom-config:
     https: false
     host: 127.0.0.1
