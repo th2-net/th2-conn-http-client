@@ -1,4 +1,4 @@
-# HTTP Client v2.1.0
+# HTTP Client v2.2.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -131,7 +131,7 @@ metadata:
   name: http-client
 spec:
   image-name: ghcr.io/th2-net/th2-conn-http-client
-  image-version: 0.7.2
+  image-version: 2.2.0-dev
   custom-config:
     https: false
     host: 127.0.0.1
@@ -177,6 +177,11 @@ spec:
 
 ## Changelog
 
+### v2.2.0
+
+* Puts unique `th2-request-id` property to metadata of request/response messages 
+* Merged `v0.8.1`
+
 ### v2.1.0
 
 * Supports th2 transport protocol
@@ -193,8 +198,13 @@ spec:
 * th2-common upgrade to `5.2.0`
 * th2-bom upgrade to `4.2.0`
 
-### v0.8.0
+### v0.8.1
 
+#### Fixed:
+
++ Fix problem with exceeding the limit for sockets to acquire when and exception is thrown during that process.
+
+### v0.8.0
 * Vulnerability check pipeline step
 * th2-common upgrade to `3.44.0`
 * th2-bom upgrade to `4.1.0`

@@ -66,6 +66,7 @@ private const val HEADER_NAME_FIELD = "name"
 private const val HEADER_VALUE_FIELD = "value"
 private const val HEADER_PREFIX = "header-"
 
+internal const val TH2_REQUEST_ID_PROPERTY = "th2-request-id"
 private const val METHOD_PROPERTY = METHOD_FIELD
 private const val URI_PROPERTY = URI_FIELD
 private const val CONTENT_TYPE_PROPERTY = "contentType"
@@ -305,7 +306,7 @@ private fun HttpMessage.toByteArrayOutputStream(): ByteArrayOutputStream {
 }
 
 private fun RawHttpRequest.toProperties(): Map<String, String> = when (this) {
-    is Th2RawHttpRequest -> metadataProperties.toMutableMap()
+    is Th2RawHttpRequest -> metadataProperties.toMutableMap().apply { put(TH2_REQUEST_ID_PROPERTY, th2RequestId) }
     else -> hashMapOf()
 }.apply {
     put(METHOD_PROPERTY, method)
