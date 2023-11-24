@@ -19,7 +19,6 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.common.grpc.ConnectionID
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
-import com.exactpro.th2.http.client.util.TH2_REQUEST_ID_PROPERTY
 import com.exactpro.th2.http.client.util.toProtoMessage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -43,11 +42,15 @@ class CommonTests {
         val rawMessage = request.toProtoMessage(ConnectionID.getDefaultInstance(), 12345L)
         val newMetadata = rawMessage.metadata.propertiesMap
         assertEquals(metadata.values.size + 2 /* method and uri */ + 1 /* th2-request-id */, newMetadata.values.size)
-        assertFalse(newMetadata[TH2_REQUEST_ID_PROPERTY].isNullOrBlank(), "The $TH2_REQUEST_ID_PROPERTY message property is null or blank")
+        assertFalse(newMetadata[PROPERTY].isNullOrBlank(), "The $PROPERTY message property is null or blank")
         metadata.forEach { (name, value) ->
             assertContains(newMetadata, name)
             assertEquals(value, newMetadata[name])
         }
         assertEquals(parentEventID, rawMessage.parentEventId)
+    }
+
+    companion object {
+        private const val PROPERTY = "th2-request-id"
     }
 }
