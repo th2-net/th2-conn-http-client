@@ -32,7 +32,6 @@ dependencies {
     kapt "com.google.auto.service:auto-service:1.1.1"
 
     testImplementation 'com.exactpro.th2:junit-jupiter-integration:0.0.1-master-6956603819-5241ee5-SNAPSHOT'
-    testImplementation "org.testcontainers:rabbitmq:1.19.3"
 }
 
 test {

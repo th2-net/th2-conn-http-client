@@ -34,6 +34,7 @@ import com.exactpro.th2.http.client.annotations.IntegrationTest
 import com.exactpro.th2.test.annotations.Th2AppFactory
 import com.exactpro.th2.test.annotations.Th2IntegrationTest
 import com.exactpro.th2.test.annotations.Th2TestFactory
+import com.exactpro.th2.test.extension.CleanupExtension
 import com.exactpro.th2.test.queue.CollectorMessageListener
 import com.exactpro.th2.test.spec.CustomConfigSpec
 import com.exactpro.th2.test.spec.RabbitMqSpec
@@ -44,8 +45,6 @@ import com.exactpro.th2.test.spec.pin
 import com.exactpro.th2.test.spec.pins
 import com.exactpro.th2.test.spec.publishers
 import com.exactpro.th2.test.spec.subscribers
-import mu.KotlinLogging
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import strikt.api.Assertion
 import strikt.api.expectThat
@@ -58,7 +57,6 @@ import strikt.assertions.matches
 import strikt.assertions.withElementAt
 import java.time.Duration.ofSeconds
 import java.time.Instant
-import java.util.concurrent.ConcurrentLinkedDeque
 import kotlin.test.assertNotNull
 
 @IntegrationTest
@@ -101,29 +99,17 @@ class ApplicationIntegrationTest {
             }
         }
 
-    private val resources = ConcurrentLinkedDeque<Pair<String, () -> Unit>>()
-
-    @AfterEach
-    fun afterEach() {
-        resources.descendingIterator().forEach { (resource, destructor) ->
-            LOGGER.info { "Destroying resource: $resource" }
-            runCatching(destructor).apply {
-                onSuccess { LOGGER.info { "Successfully destroyed resource: $resource" } }
-                onFailure { LOGGER.error(it) { "Failed to destroy resource: $resource" } }
-            }
-        }
-    }
-
     @Test
     fun `failed connection when process message without parent event id test`(
         @Th2AppFactory appFactory: CommonFactory,
         @Th2TestFactory testFactory: CommonFactory,
+        resources: CleanupExtension.Registry,
     ) {
         val eventListener = CollectorMessageListener.createWithCapacity<EventBatch>(1)
         testFactory.eventBatchRouter.subscribe(eventListener, EVENTS_PIN_NAME)
 
         val application = Application(appFactory) { resource, destructor ->
-            resources += resource to destructor
+            resources.add(resource, destructor)
         }
 
         val rootEventId: EventID = eventListener.assertRootEvent().id
@@ -168,12 +154,13 @@ class ApplicationIntegrationTest {
     fun `failed connection when process message with parent event id test`(
         @Th2AppFactory appFactory: CommonFactory,
         @Th2TestFactory testFactory: CommonFactory,
+        resources: CleanupExtension.Registry,
     ) {
         val eventListener = CollectorMessageListener.createWithCapacity<EventBatch>(1)
         testFactory.eventBatchRouter.subscribe(eventListener, EVENTS_PIN_NAME)
 
         val application = Application(appFactory) { resource, destructor ->
-            resources += resource to destructor
+            resources.add(resource, destructor)
         }
 
         eventListener.assertRootEvent()
@@ -226,12 +213,13 @@ class ApplicationIntegrationTest {
     fun `failed connection when process messages with parent event id test`(
         @Th2AppFactory appFactory: CommonFactory,
         @Th2TestFactory testFactory: CommonFactory,
+        resources: CleanupExtension.Registry,
     ) {
         val eventListener = CollectorMessageListener.createWithCapacity<EventBatch>(1)
         testFactory.eventBatchRouter.subscribe(eventListener, EVENTS_PIN_NAME)
 
         val application = Application(appFactory) { resource, destructor ->
-            resources += resource to destructor
+            resources.add(resource, destructor)
         }
 
         eventListener.assertRootEvent()
@@ -346,8 +334,6 @@ class ApplicationIntegrationTest {
         }.getEvents(0)
 
     companion object {
-        private val LOGGER = KotlinLogging.logger { }
-
         private const val BOOK_TEST = "test-book-A"
         private const val SCOPE_TEST_A = "test-scope-A"
         private const val SCOPE_TEST_B = "test-scope-B"
