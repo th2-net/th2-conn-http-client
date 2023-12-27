@@ -49,11 +49,11 @@ import org.junit.jupiter.api.Test
 import strikt.api.Assertion
 import strikt.api.expectThat
 import strikt.assertions.all
-import strikt.assertions.hasSize
 import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
 import strikt.assertions.matches
+import strikt.assertions.single
 import strikt.assertions.withElementAt
 import java.time.Duration.ofSeconds
 import java.time.Instant
@@ -127,24 +127,21 @@ class ApplicationIntegrationTest {
 
         assertNotNull(eventListener.poll(ofSeconds(2))).also {
             expectThat(it) {
-                get { eventsList }.apply {
-                    hasSize(1)
-                    withElementAt(0) {
-                        get { name }.isEqualTo("Failed to handle transport message group")
-                        get { type }.isEqualTo("Error")
-                        get { status }.isEqualTo(EventStatus.FAILED)
-                        get { id }.apply {
-                            get { bookName }.isEqualTo(rootEventId.bookName)
-                            get { scope }.isEqualTo(rootEventId.scope)
-                        }
-                        get { parentId }.isEqualTo(rootEventId)
-                        get { attachedMessageIdsList }.isEmpty()
-                        get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                            """
+                get { eventsList }.single().apply {
+                    get { name }.isEqualTo("Failed to handle transport message group")
+                    get { type }.isEqualTo("Error")
+                    get { status }.isEqualTo(EventStatus.FAILED)
+                    get { id }.apply {
+                        get { bookName }.isEqualTo(rootEventId.bookName)
+                        get { scope }.isEqualTo(rootEventId.scope)
+                    }
+                    get { parentId }.isEqualTo(rootEventId)
+                    get { attachedMessageIdsList }.isEmpty()
+                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
+                        """
                             [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
                         """.trimIndent()
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -186,24 +183,21 @@ class ApplicationIntegrationTest {
 
         assertNotNull(eventListener.poll(ofSeconds(2))).also {
             expectThat(it) {
-                get { eventsList }.apply {
-                    hasSize(1)
-                    withElementAt(0) {
-                        get { name }.isEqualTo("Failed to handle transport message group")
-                        get { type }.isEqualTo("Error")
-                        get { status }.isEqualTo(EventStatus.FAILED)
-                        get { id }.apply {
-                            get { bookName }.isEqualTo(eventId.book)
-                            get { scope }.isEqualTo(eventId.scope)
-                        }
-                        get { parentId }.isEqualTo(eventId.toProto())
-                        get { attachedMessageIdsList }.isEmpty()
-                        get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                            """
+                get { eventsList }.single().apply {
+                    get { name }.isEqualTo("Failed to handle transport message group")
+                    get { type }.isEqualTo("Error")
+                    get { status }.isEqualTo(EventStatus.FAILED)
+                    get { id }.apply {
+                        get { bookName }.isEqualTo(eventId.book)
+                        get { scope }.isEqualTo(eventId.scope)
+                    }
+                    get { parentId }.isEqualTo(eventId.toProto())
+                    get { attachedMessageIdsList }.isEmpty()
+                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
+                        """
                             [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
                         """.trimIndent()
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -268,22 +262,19 @@ class ApplicationIntegrationTest {
 
         expectThat(events) {
             all {
-                get { eventsList }.apply {
-                    hasSize(1)
-                    withElementAt(0) {
-                        get { name }.isEqualTo("Failed to handle transport message group")
-                        get { type }.isEqualTo("Error")
-                        get { status }.isEqualTo(EventStatus.FAILED)
-                        get { id }.apply {
-                            get { bookName }.isEqualTo(BOOK_TEST)
-                        }
-                        get { attachedMessageIdsList }.isEmpty()
-                        get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                            """
-                        [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                    """.trimIndent()
-                        )
+                get { eventsList }.single().apply {
+                    get { name }.isEqualTo("Failed to handle transport message group")
+                    get { type }.isEqualTo("Error")
+                    get { status }.isEqualTo(EventStatus.FAILED)
+                    get { id }.apply {
+                        get { bookName }.isEqualTo(BOOK_TEST)
                     }
+                    get { attachedMessageIdsList }.isEmpty()
+                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
+                        """
+                            [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
+                        """.trimIndent()
+                    )
                 }
             }
             withElementAt(0) {
@@ -324,12 +315,7 @@ class ApplicationIntegrationTest {
     private fun CollectorMessageListener<EventBatch>.assertRootEvent() =
         assertNotNull(poll(ofSeconds(1))).also {
             expectThat(it) {
-                get { eventsList }.apply {
-                    hasSize(1)
-                    withElementAt(0) {
-                        isRootEvent(DEFAULT_BOOK_NAME, "app")
-                    }
-                }
+                get { eventsList }.single().isRootEvent(DEFAULT_BOOK_NAME, "app")
             }
         }.getEvents(0)
 

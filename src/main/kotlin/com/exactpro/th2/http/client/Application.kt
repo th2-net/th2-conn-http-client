@@ -55,6 +55,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import mu.KotlinLogging
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -65,7 +66,6 @@ import java.util.ServiceLoader
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.SECONDS
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 private const val SEND_PIN_ATTRIBUTE = "send"
@@ -94,7 +94,7 @@ class Application(
                     .configure(KotlinFeature.NullToEmptyCollection, false)
                     .configure(KotlinFeature.NullToEmptyMap, false)
                     .configure(KotlinFeature.NullIsSameAsDefault, true)
-                    .configure(KotlinFeature.SingletonSupport, false)
+                    .configure(KotlinFeature.SingletonSupport, true)
                     .configure(KotlinFeature.StrictNullChecks, false)
                     .build()
             )
@@ -326,12 +326,8 @@ private fun createSequence(): () -> Long = Instant.now().run {
     AtomicLong(epochSecond * SECONDS.toNanos(1) + nano)
 }::incrementAndGet
 
-private fun createExecutorService(maxCount: Int): ExecutorService {
-    val threadCount = AtomicInteger(1)
-    return Executors.newFixedThreadPool(maxCount) { runnable: Runnable? ->
-        Thread(runnable).apply {
-            isDaemon = true
-            name = "th2-http-client-${threadCount.incrementAndGet()}"
-        }
-    }
-}
+private fun createExecutorService(maxCount: Int): ExecutorService =
+    Executors.newFixedThreadPool(maxCount, ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("th2-http-client-%d")
+        .build())
