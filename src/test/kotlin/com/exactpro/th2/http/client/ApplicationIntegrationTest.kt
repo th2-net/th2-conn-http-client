@@ -52,6 +52,7 @@ import strikt.assertions.all
 import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
+import strikt.assertions.isNotNull
 import strikt.assertions.matches
 import strikt.assertions.single
 import strikt.assertions.withElementAt
@@ -125,24 +126,22 @@ class ApplicationIntegrationTest {
             }
         }.build())
 
-        assertNotNull(eventListener.poll(ofSeconds(2))).also {
-            expectThat(it) {
-                get { eventsList }.single().apply {
-                    get { name }.isEqualTo("Failed to handle transport message group")
-                    get { type }.isEqualTo("Error")
-                    get { status }.isEqualTo(EventStatus.FAILED)
-                    get { id }.apply {
-                        get { bookName }.isEqualTo(rootEventId.bookName)
-                        get { scope }.isEqualTo(rootEventId.scope)
-                    }
-                    get { parentId }.isEqualTo(rootEventId)
-                    get { attachedMessageIdsList }.isEmpty()
-                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                        """
-                            [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                        """.trimIndent()
-                    )
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull().apply {
+            get { eventsList }.single().apply {
+                get { name }.isEqualTo("Failed to handle transport message group")
+                get { type }.isEqualTo("Error")
+                get { status }.isEqualTo(EventStatus.FAILED)
+                get { id }.apply {
+                    get { bookName }.isEqualTo(rootEventId.bookName)
+                    get { scope }.isEqualTo(rootEventId.scope)
                 }
+                get { parentId }.isEqualTo(rootEventId)
+                get { attachedMessageIdsList }.isEmpty()
+                get { body.toString(Charsets.UTF_8) }.isEqualTo(
+                    """
+                        [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
+                    """.trimIndent()
+                )
             }
         }
     }
@@ -181,24 +180,22 @@ class ApplicationIntegrationTest {
             setEventId(eventId)
         }.build())
 
-        assertNotNull(eventListener.poll(ofSeconds(2))).also {
-            expectThat(it) {
-                get { eventsList }.single().apply {
-                    get { name }.isEqualTo("Failed to handle transport message group")
-                    get { type }.isEqualTo("Error")
-                    get { status }.isEqualTo(EventStatus.FAILED)
-                    get { id }.apply {
-                        get { bookName }.isEqualTo(eventId.book)
-                        get { scope }.isEqualTo(eventId.scope)
-                    }
-                    get { parentId }.isEqualTo(eventId.toProto())
-                    get { attachedMessageIdsList }.isEmpty()
-                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                        """
-                            [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                        """.trimIndent()
-                    )
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull().apply {
+            get { eventsList }.single().apply {
+                get { name }.isEqualTo("Failed to handle transport message group")
+                get { type }.isEqualTo("Error")
+                get { status }.isEqualTo(EventStatus.FAILED)
+                get { id }.apply {
+                    get { bookName }.isEqualTo(eventId.book)
+                    get { scope }.isEqualTo(eventId.scope)
                 }
+                get { parentId }.isEqualTo(eventId.toProto())
+                get { attachedMessageIdsList }.isEmpty()
+                get { body.toString(Charsets.UTF_8) }.isEqualTo(
+                    """
+                        [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
+                    """.trimIndent()
+                )
             }
         }
     }
