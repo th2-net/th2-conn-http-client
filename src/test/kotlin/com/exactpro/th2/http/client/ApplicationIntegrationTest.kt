@@ -118,20 +118,19 @@ class ApplicationIntegrationTest {
         application.start()
 
         testFactory.sendMessages(RawMessage.builder().apply {
-            idBuilder().apply {
-                setSessionAlias("test-session-alias")
-                setTimestamp(Instant.now())
-                setDirection(Direction.OUTGOING)
-                setSequence(1)
-            }
+            idBuilder()
+                .setSessionAlias("test-session-alias")
+                .setTimestamp(Instant.now())
+                .setDirection(Direction.OUTGOING)
+                .setSequence(1)
         }.build())
 
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull().apply {
-            get { eventsList }.single().apply {
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
+            .get { eventsList }.single().and {
                 get { name }.isEqualTo("Failed to handle transport message group")
                 get { type }.isEqualTo("Error")
                 get { status }.isEqualTo(EventStatus.FAILED)
-                get { id }.apply {
+                get { id }.and {
                     get { bookName }.isEqualTo(rootEventId.bookName)
                     get { scope }.isEqualTo(rootEventId.scope)
                 }
@@ -143,7 +142,6 @@ class ApplicationIntegrationTest {
                     """.trimIndent()
                 )
             }
-        }
     }
 
     @Test
@@ -163,29 +161,28 @@ class ApplicationIntegrationTest {
 
         application.start()
 
-        val eventId = EventId.builder().apply {
-            setBook(BOOK_TEST)
-            setScope(SCOPE_TEST_A)
-            setTimestamp(Instant.now())
-            setId("test-id")
-        }.build()
+        val eventId = EventId.builder()
+            .setBook(BOOK_TEST)
+            .setScope(SCOPE_TEST_A)
+            .setTimestamp(Instant.now())
+            .setId("test-id")
+            .build()
 
         testFactory.sendMessages(RawMessage.builder().apply {
-            idBuilder().apply {
-                setSessionAlias("test-session-alias")
-                setTimestamp(Instant.now())
-                setDirection(Direction.OUTGOING)
-                setSequence(1)
-            }
+            idBuilder()
+                .setSessionAlias("test-session-alias")
+                .setTimestamp(Instant.now())
+                .setDirection(Direction.OUTGOING)
+                .setSequence(1)
             setEventId(eventId)
         }.build())
 
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull().apply {
-            get { eventsList }.single().apply {
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
+            .get { eventsList }.single().and {
                 get { name }.isEqualTo("Failed to handle transport message group")
                 get { type }.isEqualTo("Error")
                 get { status }.isEqualTo(EventStatus.FAILED)
-                get { id }.apply {
+                get { id }.and {
                     get { bookName }.isEqualTo(eventId.book)
                     get { scope }.isEqualTo(eventId.scope)
                 }
@@ -197,7 +194,6 @@ class ApplicationIntegrationTest {
                     """.trimIndent()
                 )
             }
-        }
     }
 
     @Test
@@ -217,37 +213,35 @@ class ApplicationIntegrationTest {
 
         application.start()
 
-        val eventIdA = EventId.builder().apply {
-            setBook(BOOK_TEST)
-            setScope(SCOPE_TEST_A)
-            setTimestamp(Instant.now())
-            setId("test-id")
-        }.build()
+        val eventIdA = EventId.builder()
+            .setBook(BOOK_TEST)
+            .setScope(SCOPE_TEST_A)
+            .setTimestamp(Instant.now())
+            .setId("test-id")
+            .build()
 
-        val eventIdB = EventId.builder().apply {
-            setBook(BOOK_TEST)
-            setScope(SCOPE_TEST_B)
-            setTimestamp(Instant.now())
-            setId("test-id")
-        }.build()
+        val eventIdB = EventId.builder()
+            .setBook(BOOK_TEST)
+            .setScope(SCOPE_TEST_B)
+            .setTimestamp(Instant.now())
+            .setId("test-id")
+            .build()
 
         testFactory.sendMessages(
             RawMessage.builder().apply {
-                idBuilder().apply {
-                    setSessionAlias("test-session-alias")
-                    setTimestamp(Instant.now())
-                    setDirection(Direction.OUTGOING)
-                    setSequence(1)
-                }
+                idBuilder()
+                    .setSessionAlias("test-session-alias")
+                    .setTimestamp(Instant.now())
+                    .setDirection(Direction.OUTGOING)
+                    .setSequence(1)
                 setEventId(eventIdA)
             }.build(),
             RawMessage.builder().apply {
-                idBuilder().apply {
-                    setSessionAlias("test-session-alias")
-                    setTimestamp(Instant.now())
-                    setDirection(Direction.OUTGOING)
-                    setSequence(1)
-                }
+                idBuilder()
+                    .setSessionAlias("test-session-alias")
+                    .setTimestamp(Instant.now())
+                    .setDirection(Direction.OUTGOING)
+                    .setSequence(1)
                 setEventId(eventIdB)
             }.build(),
         )
@@ -259,11 +253,11 @@ class ApplicationIntegrationTest {
 
         expectThat(events) {
             all {
-                get { eventsList }.single().apply {
+                get { eventsList }.single().and {
                     get { name }.isEqualTo("Failed to handle transport message group")
                     get { type }.isEqualTo("Error")
                     get { status }.isEqualTo(EventStatus.FAILED)
-                    get { id }.apply {
+                    get { id }.and {
                         get { bookName }.isEqualTo(BOOK_TEST)
                     }
                     get { attachedMessageIdsList }.isEmpty()
@@ -275,18 +269,14 @@ class ApplicationIntegrationTest {
                 }
             }
             withElementAt(0) {
-                get { getEvents(0) }.apply {
-                    get { id }.apply {
-                        get { scope }.isEqualTo(eventIdA.scope)
-                    }
+                get { getEvents(0) }.and {
+                    get { id }.get { scope }.isEqualTo(eventIdA.scope)
                     get { parentId }.isEqualTo(eventIdA.toProto())
                 }
             }
             withElementAt(1) {
-                get { getEvents(0) }.apply {
-                    get { id }.apply {
-                        get { scope }.isEqualTo(eventIdB.scope)
-                    }
+                get { getEvents(0) }.and {
+                    get { id }.get { scope }.isEqualTo(eventIdB.scope)
                     get { parentId }.isEqualTo(eventIdB.toProto())
                 }
             }
@@ -323,7 +313,7 @@ class ApplicationIntegrationTest {
         private const val SESSION_GROUP_TEST = "test-session-group"
 
         fun Assertion.Builder<Event>.isRootEvent(book: String, scope: String) {
-            get { id }.apply {
+            get { id }.and {
                 get { getBookName() }.isEqualTo(book)
                 get { getScope() }.isEqualTo(scope)
             }
