@@ -30,6 +30,21 @@ dependencies {
     compileOnly "com.google.auto.service:auto-service:1.1.1"
     annotationProcessor "com.google.auto.service:auto-service:1.1.1"
     kapt "com.google.auto.service:auto-service:1.1.1"
+
+    testImplementation 'com.exactpro.th2:junit-jupiter-integration:0.0.1-master-6956603819-5241ee5-SNAPSHOT'
+}
+
+test {
+    useJUnitPlatform {
+        excludeTags('integration-test')
+    }
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags('integration-test')
+    }
 }
 
 dependencyLocking {
