@@ -71,13 +71,13 @@ internal class ClientOptions(
     }
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
-        logger.info { "Sending request: $httpRequest" }
+        logger.debug { "Sending request: $httpRequest" }
         httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
         return httpRequest
     }
 
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> = try {
-        httpResponse.eagerly().also { logger.info { "Received response on socket '$socket': $it" } }
+        httpResponse.eagerly().also { logger.debug { "Received response on socket '$socket': $it" } }
     } catch (e: Throwable) {
         throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
     } finally {
