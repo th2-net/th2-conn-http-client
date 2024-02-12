@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 private const val SEND_PIN_ATTRIBUTE = "send"
 internal const val INPUT_QUEUE_TRANSPORT_ATTRIBUTE = SEND_PIN_ATTRIBUTE
@@ -110,6 +112,10 @@ class Application(
     }
 
     fun start() {
+        // component supported multithreading sending via single http client.
+        // increment sequence and putting into message batcher should be executed atomically.
+        val incomingLock = ReentrantLock()
+        val outgoingLock = ReentrantLock()
         val incomingSequence = createSequence()
         val outgoingSequence = createSequence()
 
@@ -140,9 +146,11 @@ class Application(
                         .also { registerResource("transport message batcher", it::close) }
 
                 onRequest = { request: RawHttpRequest ->
-                    val rawMessage = request.toTransportMessage(sessionAlias, outgoingSequence())
-
-                    messageBatcher.onMessage(rawMessage, sessionGroup)
+                    val rawMessage = outgoingLock.withLock {
+                        request.toTransportMessage(sessionAlias, outgoingSequence()).also {
+                            messageBatcher.onMessage(it, sessionGroup)
+                        }
+                    }
                     eventBatcher.storeEvent(
                         rawMessage.eventId?.toProto() ?: rootEventId,
                         "Sent HTTP request",
@@ -150,10 +158,12 @@ class Application(
                     )
                 }
                 onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-                    messageBatcher.onMessage(
-                        response.toTransportMessage(sessionAlias, incomingSequence(), request),
-                        sessionGroup
-                    )
+                    incomingLock.withLock {
+                        messageBatcher.onMessage(
+                            response.toTransportMessage(sessionAlias, incomingSequence(), request),
+                            sessionGroup
+                        )
+                    }
                     stateManager.onResponse(response)
                 }
             } else {
@@ -167,9 +177,10 @@ class Application(
                 }.also { registerResource("proto message batcher", it::close) }
 
                 onRequest = { request: RawHttpRequest ->
-                    val rawMessage = request.toProtoMessage(connectionId, outgoingSequence())
-
-                    messageBatcher.onMessage(rawMessage)
+                    val rawMessage = outgoingLock.withLock {
+                        request.toProtoMessage(connectionId, outgoingSequence())
+                            .also(messageBatcher::onMessage)
+                    }
                     eventBatcher.storeEvent(
                         if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId,
                         "Sent HTTP request",
@@ -177,7 +188,11 @@ class Application(
                     )
                 }
                 onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-                    messageBatcher.onMessage(response.toProtoMessage(connectionId, incomingSequence(), request))
+                    incomingLock.withLock {
+                        messageBatcher.onMessage(
+                            response.toProtoMessage(connectionId, incomingSequence(), request)
+                        )
+                    }
                     stateManager.onResponse(response)
                 }
             }
