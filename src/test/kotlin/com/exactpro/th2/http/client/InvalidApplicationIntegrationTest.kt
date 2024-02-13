@@ -62,7 +62,7 @@ import kotlin.test.assertNotNull
 
 @IntegrationTest
 @Th2IntegrationTest
-class ApplicationIntegrationTest {
+class InvalidApplicationIntegrationTest {
     @JvmField
     @Suppress("unused")
     internal val customConfig = CustomConfigSpec.fromString(
