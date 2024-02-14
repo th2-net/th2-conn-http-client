@@ -190,7 +190,8 @@ spec:
 
 * Supports th2 transport protocol
 * Use event / message batcher
-    * Support batching by session group or session alias + direction
+  * messages are batched by session group
+  * events are batched by session scope
 
 * owasp upgrade to `8.2.1`
 * th2-common upgrade to `5.3.0`

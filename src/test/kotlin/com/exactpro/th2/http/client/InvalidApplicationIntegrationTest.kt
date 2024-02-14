@@ -49,13 +49,13 @@ import org.junit.jupiter.api.Test
 import strikt.api.Assertion
 import strikt.api.expectThat
 import strikt.assertions.all
+import strikt.assertions.any
 import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
 import strikt.assertions.isNotNull
 import strikt.assertions.matches
 import strikt.assertions.single
-import strikt.assertions.withElementAt
 import java.time.Duration.ofSeconds
 import java.time.Instant
 import kotlin.test.assertNotNull
@@ -268,17 +268,13 @@ class InvalidApplicationIntegrationTest {
                     )
                 }
             }
-            withElementAt(0) {
-                get { getEvents(0) }.and {
-                    get { id }.get { scope }.isEqualTo(eventIdA.scope)
-                    get { parentId }.isEqualTo(eventIdA.toProto())
-                }
+
+            // conn processes message in different thread and events can be reordered
+            any {
+                isIdEqualTo(eventIdA)
             }
-            withElementAt(1) {
-                get { getEvents(0) }.and {
-                    get { id }.get { scope }.isEqualTo(eventIdB.scope)
-                    get { parentId }.isEqualTo(eventIdB.toProto())
-                }
+            any {
+                isIdEqualTo(eventIdB)
             }
         }
     }
@@ -321,6 +317,13 @@ class InvalidApplicationIntegrationTest {
             get { name }.matches(Regex("$scope \\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z) - Root event"))
             get { type }.isEqualTo("Microservice")
             get { status }.isEqualTo(EventStatus.SUCCESS)
+        }
+
+        fun Assertion.Builder<EventBatch>.isIdEqualTo(eventId: EventId) {
+            get { eventsList }.single().and {
+                get { id }.get { scope }.isEqualTo(eventId.scope)
+                get { parentId }.isEqualTo(eventId.toProto())
+            }
         }
     }
 }
