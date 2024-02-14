@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2024 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.exactpro.th2.http.client
 
+import mu.KLogger
 import mu.KotlinLogging
 import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
@@ -71,13 +72,21 @@ internal class ClientOptions(
     }
 
     override fun onRequest(httpRequest: RawHttpRequest): RawHttpRequest {
-        logger.info { "Sending request: $httpRequest" }
+        logger.log(
+            infoMsg = { "Sending request to URL: ${httpRequest.uri}" },
+            debugMsg = { "Sending request: $httpRequest" },
+        )
         httpRequest.runCatching(onRequest).onFailure { logger.error(it) { "Failed to execute onRequest hook" } }
         return httpRequest
     }
 
     override fun onResponse(socket: Socket, uri: URI, httpResponse: RawHttpResponse<Void>): EagerHttpResponse<Void> = try {
-        httpResponse.eagerly().also { logger.info { "Received response on socket '$socket': $it" } }
+        httpResponse.eagerly().also {
+            logger.log(
+                infoMsg = { "Received response on local port '${socket.localPort}' from URL: $uri" },
+                debugMsg = { "Received response on socket '$socket': $it" },
+            )
+        }
     } catch (e: Throwable) {
         throw IllegalStateException("Cannot read http response eagerly during onResponse call", e)
     } finally {
@@ -161,6 +170,18 @@ internal class ClientOptions(
 
         fun Socket.tryClose() = runCatching(Socket::close).onFailure { error ->
             logger.warn(error) { "Cannot close socket: $this" }
+        }
+    }
+
+    companion object {
+        private fun KLogger.log(
+            infoMsg: (() -> Any?)? = null,
+            debugMsg: (() -> Any?)? = null,
+        ) {
+            when {
+                debugMsg != null && isDebugEnabled -> debug(debugMsg)
+                infoMsg != null && isInfoEnabled -> info(infoMsg)
+            }
         }
     }
 }

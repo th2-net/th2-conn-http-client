@@ -1,4 +1,4 @@
-# HTTP Client v2.2.0
+# HTTP Client v2.2.1
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -177,6 +177,10 @@ spec:
 
 ## Changelog
 
+### v2.2.1
+
+* Fixed problem - connect reorders sequence numbers when sending messages in parallel mode by one session alias.
+
 ### v2.2.0
 
 * Puts unique `th2-request-id` property to metadata of request/response messages 
@@ -186,7 +190,8 @@ spec:
 
 * Supports th2 transport protocol
 * Use event / message batcher
-    * Support batching by session group or session alias + direction
+  * messages are batched by session group
+  * events are batched by session scope
 
 * owasp upgrade to `8.2.1`
 * th2-common upgrade to `5.3.0`
