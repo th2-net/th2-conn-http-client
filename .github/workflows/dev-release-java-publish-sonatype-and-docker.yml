@@ -15,7 +15,7 @@ jobs:
     with:
       build-target: 'Sonatype,Docker'
       runsOn: ubuntu-latest
-      gradleVersion: '7'
+      gradleVersion: '8'
       docker-username: ${{ github.actor }}
       devRelease: true
     secrets:
