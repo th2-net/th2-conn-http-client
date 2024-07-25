@@ -2,7 +2,10 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.8.22'
     id 'org.jetbrains.kotlin.kapt' version '1.8.22'
     id 'application'
+    id 'signing'
+    id 'maven-publish'
     id 'com.exactpro.th2.gradle.component' version '0.1.1'
+    id 'com.exactpro.th2.gradle.publish' version '0.1.1'
 }
 
 group = 'com.exactpro.th2'
