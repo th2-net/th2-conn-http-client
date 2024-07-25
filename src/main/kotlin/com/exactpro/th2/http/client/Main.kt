@@ -19,7 +19,7 @@
 package com.exactpro.th2.http.client
 
 import com.exactpro.th2.common.schema.factory.CommonFactory
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread

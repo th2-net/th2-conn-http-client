@@ -36,7 +36,7 @@ import com.exactpro.th2.test.spec.pin
 import com.exactpro.th2.test.spec.pins
 import com.exactpro.th2.test.spec.publishers
 import com.exactpro.th2.test.spec.subscribers
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test

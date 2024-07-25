@@ -16,8 +16,8 @@
 
 package com.exactpro.th2.http.client
 
-import mu.KLogger
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KLogger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import rawhttp.core.EagerHttpResponse
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
@@ -179,8 +179,8 @@ internal class ClientOptions(
             debugMsg: (() -> Any?)? = null,
         ) {
             when {
-                debugMsg != null && isDebugEnabled -> debug(debugMsg)
-                infoMsg != null && isInfoEnabled -> info(infoMsg)
+                debugMsg != null && isDebugEnabled() -> debug(debugMsg)
+                infoMsg != null && isInfoEnabled() -> info(infoMsg)
             }
         }
     }
