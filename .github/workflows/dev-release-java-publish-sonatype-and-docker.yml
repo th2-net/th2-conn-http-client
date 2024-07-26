@@ -15,7 +15,7 @@ jobs:
     with:
       build-target: 'Sonatype,Docker'
       runsOn: ubuntu-latest
-      gradleVersion: '7'
+      gradleVersion: '8'
       docker-username: ${{ github.actor }}
       devRelease: true
     secrets:
@@ -24,3 +24,4 @@ jobs:
       sonatypeSigningKey: ${{ secrets.SONATYPE_GPG_ARMORED_KEY }}
       sonatypeSigningPassword: ${{ secrets.SONATYPE_SIGNING_PASSWORD }}
       docker-password: ${{ secrets.GITHUB_TOKEN }}
+      nvd-api-key: ${{ secrets.NVD_APIKEY }}

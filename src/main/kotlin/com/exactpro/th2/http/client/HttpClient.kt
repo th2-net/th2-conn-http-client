@@ -18,7 +18,7 @@ package com.exactpro.th2.http.client
 
 import com.exactpro.th2.http.client.util.Certificate
 import com.exactpro.th2.http.client.util.getSocketFactory
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import rawhttp.core.HttpVersion
 import rawhttp.core.IOSupplier
 import rawhttp.core.RawHttp

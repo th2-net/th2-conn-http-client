@@ -1,28 +1,41 @@
-buildscript {
-    repositories {
-        gradlePluginPortal()
-        maven {
-            url = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        }
-    }
-    dependencies {
-        classpath "com.exactpro.th2:th2-gradle-plugin:0.0.1-dev-5915968839-41381e5-SNAPSHOT"
-    }
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.8.22'
+    id 'org.jetbrains.kotlin.kapt' version '1.8.22'
+    id 'application'
+    id 'signing'
+    id 'maven-publish'
+    id 'com.exactpro.th2.gradle.component' version '0.1.1'
+    id 'com.exactpro.th2.gradle.publish' version '0.1.1'
 }
 
-apply plugin: "com.exactpro.th2.common-conventions"
-apply plugin: "com.exactpro.th2.artifacts-conventions"
-apply plugin: "com.exactpro.th2.docker-conventions"
+group = 'com.exactpro.th2'
+version = release_version
 
-apply plugin: 'kotlin-kapt'
+repositories {
+    mavenCentral()
+    maven {
+        name 'Sonatype_snapshots'
+        url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
+    }
+    maven {
+        name 'Sonatype_releases'
+        url 'https://s01.oss.sonatype.org/content/repositories/releases/'
+    }
+
+}
+
+configurations.configureEach {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+}
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.5.0')
-
-    implementation("com.exactpro.th2:common:5.4.0-dev") {
+    implementation("com.exactpro.th2:common:5.14.0-dev") {
         exclude group: 'com.exactpro.th2', module: 'task-utils'
     }
-    implementation "com.exactpro.th2:common-utils:2.2.0-dev"
+    implementation "com.exactpro.th2:common-utils:2.2.3-dev"
+
+    implementation "io.github.oshai:kotlin-logging:5.1.4"
 
     implementation "com.athaydes.rawhttp:rawhttp-core:2.4.1"
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin"
@@ -31,7 +44,11 @@ dependencies {
     annotationProcessor "com.google.auto.service:auto-service:1.1.1"
     kapt "com.google.auto.service:auto-service:1.1.1"
 
-    testImplementation 'com.exactpro.th2:junit-jupiter-integration:0.0.1-master-6956603819-5241ee5-SNAPSHOT'
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5"
+    testImplementation 'com.exactpro.th2:junit-jupiter-integration:0.0.1'
+    testImplementation 'io.strikt:strikt-core:0.34.1'
+    testImplementation 'io.strikt:strikt-jackson:0.34.1'
 }
 
 test {
@@ -47,6 +64,6 @@ tasks.register('integrationTest', Test) {
     }
 }
 
-dependencyLocking {
-    lockAllConfigurations()
+application {
+    mainClass = 'com.exactpro.th2.http.client.Main'
 }

@@ -19,7 +19,7 @@ package com.exactpro.th2.http.client
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.CONTENT_LENGTH_HEADER
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
@@ -99,7 +99,7 @@ class ClientTest {
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
             requestFlag.countDown()
-            LOGGER.debug("Response handled: ${response.statusCode}")
+            LOGGER.debug { "Response handled: ${response.statusCode}" }
         }
 
         val client = HttpClient(
@@ -160,12 +160,12 @@ class ClientTest {
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
-            LOGGER.info("Request submitted: ${request.startLine}")
+            LOGGER.info { "Request submitted: ${request.startLine}" }
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
             requestFlag.countDown()
-            LOGGER.info("Response handled: ${response.statusCode}")
+            LOGGER.info { "Response handled: ${response.statusCode}" }
         }
 
         val client = HttpClient(
