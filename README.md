@@ -230,6 +230,17 @@ spec:
 * th2-common upgrade to `3.44.0`
 * th2-bom upgrade to `4.1.0`
 
+### v0.8.1
+
+#### Fixed:
+
++ Fix problem with exceeding the limit for sockets to acquire when and exception is thrown during that process.
+
+### v0.8.0
+* Vulnerability check pipeline step
+* th2-common upgrade to `3.44.0`
+* th2-bom upgrade to `4.1.0`
+
 ### v0.7.2
 
 #### Added:
