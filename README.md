@@ -185,7 +185,6 @@ spec:
   + kotlin-logging: `7.0.13`
   + common: `5.16.1-dev`
   + common-utils: `2.4.0-dev`
-  + rawhttp-core: `2.6.0`
 
 ### v2.3.0
 
