@@ -47,7 +47,9 @@ fun get(
     return client.send(
         RawHttpRequest(
             RequestLine("GET", URI("/"), HTTP_1_1),
-            RawHttpHeaders.empty(),
+            RawHttpHeaders.newBuilder()
+                .with("Host", host)
+                .build(),
             null,
             null
         )

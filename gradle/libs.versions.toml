@@ -1,0 +1,23 @@
+[versions]
+kotlin = "2.2.10"
+th2-plugin = "0.3.8"
+strikt = "0.34.1"
+
+[libraries]
+th2-common = { group = "com.exactpro.th2", name = "common", version = "5.16.1-dev" }
+th2-common-utils = { group = "com.exactpro.th2", name = "common-utils", version = "2.4.0-dev" }
+
+rawhttp-core = { group = "com.athaydes.rawhttp", name = "rawhttp-core", version = "2.6.0" }
+kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging", version = "7.0.13" }
+
+auto-service = { group = "com.google.auto.service", name = "auto-service", version = "1.1.1" }
+
+junit-jupiter-integration = { group = "com.exactpro.th2", name = "junit-jupiter-integration", version = "0.1.0" }
+
+strikt-core = { group = "io.strikt", name = "strikt-core", version.ref = "strikt" }
+strikt-jackson = { group = "io.strikt", name = "strikt-jackson", version.ref = "strikt" }
+
+[plugins]
+th2-component = { id = "com.exactpro.th2.gradle.component", version.ref = "th2-plugin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }

@@ -1,4 +1,4 @@
-# HTTP Client v2.3.0
+# HTTP Client v2.4.1
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -176,6 +176,16 @@ spec:
 ```
 
 ## Changelog
+
+### v2.3.1
+
++ Updated:
+  + th2 gradle plugin: `0.3.8` (bom: `4.14.1`) 
+  + kotlin: `2.2.10`
+  + kotlin-logging: `7.0.13`
+  + common: `5.16.1-dev`
+  + common-utils: `2.4.0-dev`
+  + rawhttp-core: `2.6.0`
 
 ### v2.3.0
 
