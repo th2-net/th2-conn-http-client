@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -136,11 +136,9 @@ class InvalidApplicationIntegrationTest {
                 }
                 get { parentId }.isEqualTo(rootEventId)
                 get { attachedMessageIdsList }.isEmpty()
-                get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                    """
-                        [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                    """.trimIndent()
-                )
+                get { body.toString(Charsets.UTF_8) }.matches(Regex("""
+                    \[\{"data":"java\.net\.ConnectException: Connection refused( \(Connection refused\))?","type":"message"}]
+                """.trimIndent()))
             }
     }
 
@@ -188,11 +186,9 @@ class InvalidApplicationIntegrationTest {
                 }
                 get { parentId }.isEqualTo(eventId.toProto())
                 get { attachedMessageIdsList }.isEmpty()
-                get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                    """
-                        [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                    """.trimIndent()
-                )
+                get { body.toString(Charsets.UTF_8) }.matches(Regex("""
+                    \[\{"data":"java\.net\.ConnectException: Connection refused( \(Connection refused\))?","type":"message"}]
+                """.trimIndent()))
             }
     }
 
@@ -261,11 +257,9 @@ class InvalidApplicationIntegrationTest {
                         get { bookName }.isEqualTo(BOOK_TEST)
                     }
                     get { attachedMessageIdsList }.isEmpty()
-                    get { body.toString(Charsets.UTF_8) }.isEqualTo(
-                        """
-                            [{"data":"java.net.ConnectException: Connection refused (Connection refused)","type":"message"}]
-                        """.trimIndent()
-                    )
+                    get { body.toString(Charsets.UTF_8) }.matches(Regex("""
+                        \[\{"data":"java\.net\.ConnectException: Connection refused( \(Connection refused\))?","type":"message"}]
+                    """.trimIndent()))
                 }
             }
 
@@ -310,7 +304,7 @@ class InvalidApplicationIntegrationTest {
 
         fun Assertion.Builder<Event>.isRootEvent(book: String, scope: String) {
             get { id }.and {
-                get { getBookName() }.isEqualTo(book)
+                get { bookName }.isEqualTo(book)
                 get { getScope() }.isEqualTo(scope)
             }
             get { hasParentId() }.isFalse()

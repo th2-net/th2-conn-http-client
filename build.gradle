@@ -33,6 +33,10 @@ dependencies {
     testImplementation(libs.strikt.jackson)
 }
 
+application {
+    mainClass = 'com.exactpro.th2.http.client.Main'
+}
+
 test {
     useJUnitPlatform {
         excludeTags('integration-test')
@@ -44,8 +48,24 @@ tasks.register('integrationTest', Test) {
     useJUnitPlatform {
         includeTags('integration-test')
     }
+
+    if (isPodmanInstalled()) {
+        environment("DOCKER_HOST", "unix:///run/user/${getUid()}/podman/podman.sock")
+        environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+    }
 }
 
-application {
-    mainClass = 'com.exactpro.th2.http.client.Main'
+static def isPodmanInstalled() {
+    try {
+        def process = new ProcessBuilder("podman", "--version").start()
+        process.waitFor()
+        return process.exitValue() == 0
+    } catch (IOException ignored) {
+        println("podman isn't installed")
+        return false
+    }
+}
+
+static def getUid() {
+    new ProcessBuilder("id", "-u").start().inputStream.text.trim()
 }
