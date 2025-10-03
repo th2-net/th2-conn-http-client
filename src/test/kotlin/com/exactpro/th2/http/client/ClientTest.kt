@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2023 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.http.client.api.decorators.Th2RawHttpRequest
 import com.exactpro.th2.http.client.util.CONTENT_LENGTH_HEADER
-import mu.KotlinLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
@@ -44,7 +45,8 @@ class ClientTest {
         private val LOGGER = KotlinLogging.logger { }
 
         private const val serverPort = 8086
-        private const val body = """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
+        private const val body =
+            """{ "id" : 901, "name" : { "first":"Tom", "middle":"and", "last":"Jerry" }, "phones" : [ {"type" : "home", "number" : "1233333" }, {"type" : "work", "number" : "264444" }], "lazy" : false, "married" : null }"""
         private var responseCount = AtomicInteger(0)
 
         private val server = TcpRawHttpServer(serverPort)
@@ -76,11 +78,11 @@ class ClientTest {
 
     @Test
     fun `Simple response test`() {
-        val parentEventID = "testParentId"
+        val parentEventID = EventID.newBuilder().setId("testParentId").build()
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
         val requestFlag = CountDownLatch(1)
 
-        var newParentID = ""
+        var newParentID = EventID.newBuilder().setId("testParentIdNew").build()
         var newMetadata = mapOf<String, String>()
 
         val prepareRequest = { request: RawHttpRequest -> request }
@@ -90,21 +92,39 @@ class ClientTest {
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
-            LOGGER.debug("Request submitted: ${request.uri}")
+            LOGGER.debug { "Request submitted: ${request.uri}" }
             newMetadata = (request as Th2RawHttpRequest).metadataProperties
             newParentID = request.parentEventId
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
             requestFlag.countDown()
-            LOGGER.debug("Response handled: ${response.statusCode}")
+            LOGGER.debug { "Response handled: ${response.statusCode}" }
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  5, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(
+            false,
+            "localhost",
+            serverPort,
+            20000,
+            5000,
+            5,
+            emptyMap(),
+            prepareRequest,
+            onRequest,
+            onResponse
+        )
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
-        val request = Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata)
+        val request = Th2RawHttpRequest(
+            requestLine,
+            httpHeaders,
+            BytesBody(requestBody).toBodyReader(),
+            null,
+            parentEventID,
+            metadata
+        )
 
         val response = client.send(request)
 
@@ -129,7 +149,7 @@ class ClientTest {
 
         val requestFlag = CountDownLatch(6)
 
-        val parentEventID = "testParentId"
+        val parentEventID = EventID.newBuilder().setId("testParentId").build()
         val metadata = mapOf("propertyOne" to "propertyOneValue", "propertyTwo" to "propertyTwoValue")
 
         val prepareRequest = { request: RawHttpRequest -> request }
@@ -140,22 +160,42 @@ class ClientTest {
         }.build()
 
         val onRequest = { request: RawHttpRequest ->
-            LOGGER.info("Request submitted: ${request.startLine}")
+            LOGGER.info { "Request submitted: ${request.startLine}" }
         }
 
         val onResponse = { _: RawHttpRequest, response: RawHttpResponse<*> ->
             requestFlag.countDown()
-            LOGGER.info("Response handled: ${response.statusCode}")
+            LOGGER.info { "Response handled: ${response.statusCode}" }
         }
 
-        val client = HttpClient(false, "localhost", serverPort, 20000, 5000,  2, emptyMap(), prepareRequest, onRequest, onResponse)
+        val client = HttpClient(
+            false,
+            "localhost",
+            serverPort,
+            20000,
+            5000,
+            2,
+            emptyMap(),
+            prepareRequest,
+            onRequest,
+            onResponse
+        )
         client.start()
 
         val requestLine = RequestLine("GET", URI("/test"), HttpVersion.HTTP_1_1)
 
         repeat(requestFlag.count.toInt()) {
             executor.submit {
-                client.send(Th2RawHttpRequest(requestLine, httpHeaders, BytesBody(requestBody).toBodyReader(), null, parentEventID, metadata))
+                client.send(
+                    Th2RawHttpRequest(
+                        requestLine,
+                        httpHeaders,
+                        BytesBody(requestBody).toBodyReader(),
+                        null,
+                        parentEventID,
+                        metadata
+                    )
+                )
             }
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,9 @@ fun get(
     return client.send(
         RawHttpRequest(
             RequestLine("GET", URI("/"), HTTP_1_1),
-            RawHttpHeaders.empty(),
+            RawHttpHeaders.newBuilder()
+                .with("Host", host)
+                .build(),
             null,
             null
         )

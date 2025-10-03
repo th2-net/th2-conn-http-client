@@ -1,208 +1,71 @@
 plugins {
     id 'application'
-    id 'maven-publish'
-    id "io.github.gradle-nexus.publish-plugin" version "1.0.0"
-    id 'signing'
-    id 'com.palantir.docker' version '0.25.0'
-    id 'org.jetbrains.kotlin.jvm' version "${kotlin_version}"
-    id 'org.jetbrains.kotlin.kapt' version "${kotlin_version}"
-}
-
-ext {
-    sharedDir = file("${project.rootDir}/shared")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.th2.component)
 }
 
 group = 'com.exactpro.th2'
 version = release_version
 
-sourceCompatibility = 11
-targetCompatibility = 11
-
 repositories {
     mavenCentral()
-
-    maven {
-            name 'Sonatype_snapshots'
-            url 'https://s01.oss.sonatype.org/content/repositories/snapshots/'
-    }
-
-    maven {
-            name 'Sonatype_releases'
-            url 'https://s01.oss.sonatype.org/content/repositories/releases/'
-    }
-
-    configurations.all {
-        resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
-        resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
-    }
 }
-
-jar {
-    manifest {
-        attributes(
-                'Created-By': "${System.getProperty('java.version')} (${System.getProperty('java.vendor')})",
-                'Specification-Title': '',
-                'Specification-Vendor': 'Exactpro Systems LLC',
-                'Implementation-Title': project.archivesBaseName,
-                'Implementation-Vendor': 'Exactpro Systems LLC',
-                'Implementation-Vendor-Id': 'com.exactpro',
-                'Implementation-Version': project.version
-        )
-    }
-}
-
-java {
-    withJavadocJar()
-    withSourcesJar()
-}
-
-// conditionals for publications
-tasks.withType(PublishToMavenRepository) {
-    onlyIf {
-        (repository == publishing.repositories.nexusRepository &&
-            project.hasProperty('nexus_user') &&
-            project.hasProperty('nexus_password') &&
-            project.hasProperty('nexus_url')) ||
-        (repository == publishing.repositories.sonatype &&
-            project.hasProperty('sonatypeUsername') &&
-            project.hasProperty('sonatypePassword')) ||
-        (repository == publishing.repositories.localRepo)
-    }
-}
-tasks.withType(Sign) {
-    onlyIf { project.hasProperty('signingKey') &&
-        project.hasProperty('signingPassword')
-    }
-}
-// disable running task 'initializeSonatypeStagingRepository' on a gitlab
-tasks.whenTaskAdded {task ->
-    if(task.name.equals('initializeSonatypeStagingRepository') &&
-        !(project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword'))
-    ) {
-        task.enabled = false
-    }
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from(components.java)
-            pom {
-              name = rootProject.name
-              packaging = 'jar'
-              description = rootProject.description
-              url = vcs_url
-              scm {
-                url = vcs_url
-              }
-              licenses {
-                license {
-                  name = 'The Apache License, Version 2.0'
-                  url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                }
-              }
-              developers {
-                developer {
-                  id = 'developer'
-                  name = 'developer'
-                  email = 'developer@exactpro.com'
-                }
-              }
-              scm {
-                url = vcs_url
-              }
-            }
-        }
-    }
-    repositories {
-        maven {
-            name = 'localRepo'
-            url = sharedDir
-        }
-//Nexus repo to publish from gitlab
-        maven {
-            name = 'nexusRepository'
-            credentials {
-                username = project.findProperty('nexus_user')
-                password = project.findProperty('nexus_password')
-            }
-            url = project.findProperty('nexus_url')
-        }
-    }
-}
-
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-        }
-    }
-}
-
-signing {
-    def signingKey = findProperty("signingKey")
-    def signingPassword = findProperty("signingPassword")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign publishing.publications.mavenJava
-}
-
-clean {
-    delete sharedDir
-}
-
 
 dependencies {
-    api platform('com.exactpro.th2:bom:4.1.0')
+    implementation(libs.th2.common) {
+        exclude group: 'com.exactpro.th2', module: 'task-utils'
+    }
+    implementation(libs.th2.common.utils)
 
-    implementation 'com.exactpro.th2:common:3.44.0'
-    implementation 'org.slf4j:slf4j-api'
+    implementation(libs.kotlin.logging)
 
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-stdlib-jdk8'
-    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
-    implementation group: 'io.github.microutils', name: 'kotlin-logging', version: '1.7.9'
-    implementation group: 'com.athaydes.rawhttp', name: 'rawhttp-core', version: '2.4.1'
-    implementation group: 'com.fasterxml.jackson.module', name: 'jackson-module-kotlin', version: '2.11.2'
+    implementation(libs.rawhttp.core)
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
+    compileOnly(libs.auto.service)
+    kapt(libs.auto.service)
 
-    testImplementation group: 'org.jetbrains.kotlin', name: 'kotlin-test-junit5'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.7.2'
-
-    compileOnly 'com.google.auto.service:auto-service:1.0.1'
-    annotationProcessor 'com.google.auto.service:auto-service:1.0.1'
-    kapt 'com.google.auto.service:auto-service:1.0.1'
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation(libs.junit.jupiter.integration)
+    testImplementation(libs.strikt.core)
+    testImplementation(libs.strikt.jackson)
 }
 
 application {
-    mainClassName 'com.exactpro.th2.http.client.Main'
-}
-
-applicationName = 'service'
-
-distTar {
-    archiveName "${applicationName}.tar"
-}
-
-dockerPrepare {
-    dependsOn distTar
-}
-
-docker {
-    copySpec.from(tarTree("$buildDir/distributions/${applicationName}.tar"))
-}
-
-compileKotlin {
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-}
-
-compileTestKotlin {
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    mainClass = 'com.exactpro.th2.http.client.Main'
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags('integration-test')
+    }
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    useJUnitPlatform {
+        includeTags('integration-test')
+    }
+
+    if (isPodmanInstalled()) {
+        environment("DOCKER_HOST", "unix:///run/user/${getUid()}/podman/podman.sock")
+        environment("TESTCONTAINERS_RYUK_DISABLED", "true")
+    }
+}
+
+static def isPodmanInstalled() {
+    try {
+        def process = new ProcessBuilder("podman", "--version").start()
+        process.waitFor()
+        return process.exitValue() == 0
+    } catch (IOException ignored) {
+        println("podman isn't installed")
+        return false
+    }
+}
+
+static def getUid() {
+    new ProcessBuilder("id", "-u").start().inputStream.text.trim()
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2021 Exactpro (Exactpro Systems Limited)
+ * Copyright 2021-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import kotlin.test.assertTrue
 import kotlin.text.Charsets.UTF_8
 
 class TestClientCertificate {
+    // openssl req -x509 -newkey rsa:2048 -nodes -keyout test.key -out test.crt -days 3650 -subj "/C=US/ST=California/L=San Francisco/O=TestSSL/OU=Client/CN=TestSSL Client Certificate"
     private val certificate = Certificate(
         File("src/test/resources/test.crt").loadCertificate(),
         File("src/test/resources/test.key").loadPrivateKey()
