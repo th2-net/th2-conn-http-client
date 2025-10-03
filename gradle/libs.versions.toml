@@ -7,7 +7,7 @@ strikt = "0.34.1"
 th2-common = { group = "com.exactpro.th2", name = "common", version = "5.16.1-dev" }
 th2-common-utils = { group = "com.exactpro.th2", name = "common-utils", version = "2.4.0-dev" }
 
-rawhttp-core = { group = "com.athaydes.rawhttp", name = "rawhttp-core", version = "2.4.1" }
+rawhttp-core = { group = "com.athaydes.rawhttp", name = "rawhttp-core", version = "2.6.0" }
 kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging", version = "7.0.13" }
 
 auto-service = { group = "com.google.auto.service", name = "auto-service", version = "1.1.1" }
