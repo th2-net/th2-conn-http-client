@@ -12,7 +12,7 @@ kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging", version =
 
 auto-service = { group = "com.google.auto.service", name = "auto-service", version = "1.1.1" }
 
-junit-jupiter-integration = { group = "com.exactpro.th2", name = "junit-jupiter-integration", version = "0.1.0" }
+junit-jupiter-integration = { group = "com.exactpro.th2", name = "junit-jupiter-integration", version = "0.2.0" }
 
 strikt-core = { group = "io.strikt", name = "strikt-core", version.ref = "strikt" }
 strikt-jackson = { group = "io.strikt", name = "strikt-jackson", version.ref = "strikt" }
