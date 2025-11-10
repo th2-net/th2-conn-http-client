@@ -1,4 +1,4 @@
-# HTTP Client v2.4.1
+# HTTP Client v2.3.2
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -176,6 +176,14 @@ spec:
 ```
 
 ## Changelog
+
+### v2.3.2
+
++ Produce multi-platform docker image
+  + migrated to [amazoncorretto:11-alpine-jdk](https://hub.docker.com/layers/library/amazoncorretto/11-alpine-jdk) docker image as base
++ Updated:
+  + th2 gradle plugin: `0.3.10` (bom: `4.14.2`)
+  + kotlin: `2.2.21`
 
 ### v2.3.1
 
