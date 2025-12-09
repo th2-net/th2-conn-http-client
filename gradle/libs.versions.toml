@@ -4,7 +4,7 @@ th2-plugin = "0.3.10"
 strikt = "0.34.1"
 
 [libraries]
-th2-common = { group = "com.exactpro.th2", name = "common", version = "5.16.1-dev" }
+th2-common = { group = "com.exactpro.th2", name = "common", version = "5.17.0-dev" }
 th2-common-utils = { group = "com.exactpro.th2", name = "common-utils", version = "2.4.0-dev" }
 
 rawhttp-core = { group = "com.athaydes.rawhttp", name = "rawhttp-core", version = "2.4.1" }
