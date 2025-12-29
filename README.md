@@ -21,7 +21,6 @@ Main configuration is done via setting following properties in a custom configur
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (`null` by default)
 + **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`true` by default)
-+ **batcherThreads** - amount of event/message batcher threads (`2` by default)
 + **maxBatchSize** - max size of outgoing message batch (`1000` by default)
 + **maxFlushTime** - max message batch flush time (`1000` by default)
 
@@ -143,7 +142,6 @@ spec:
     clientCertificate: /secret/storage/cert.crt
     certificatePrivateKey: /secret/storage/private.key
     useTransport: false
-    batcherThreads: 2
     maxBatchSize: 1000
     maxFlushTime: 1000
     defaultHeaders:

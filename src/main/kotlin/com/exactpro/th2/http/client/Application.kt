@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2025 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,9 +80,8 @@ class Application(
 ) {
     private val stateManager = load<IStateManager>(BasicStateManager::class.java)
     private val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
-    private val authSettingsType = load<IAuthSettingsTypeProvider>(BasicAuthSettingsTypeProvider::class.java).type
 
-    private val settings: Settings
+    private val settings: Settings = getSettings(factory::getCustomConfiguration)
     private val eventRouter: MessageRouter<EventBatch> = factory.eventBatchRouter
     private val protoMR: MessageRouter<MessageGroupBatch> = factory.messageRouterMessageGroupBatch
     private val transportMR: MessageRouter<GroupBatch> = factory.transportGroupBatchRouter
@@ -298,35 +297,7 @@ class Application(
     }
 }
 
-data class Settings(
-    val https: Boolean = false,
-    val host: String,
-    val port: Int = if (https) 443 else 80,
-    val readTimeout: Int = 5000,
-    val maxParallelRequests: Int = 5,
-    val keepAliveTimeout: Long = 15000,
-    val defaultHeaders: Map<String, List<String>> = emptyMap(),
-    val sessionAlias: String,
-    val auth: IAuthSettings? = null,
-    val validateCertificates: Boolean = true,
-    val useTransport: Boolean = false,
-    val batcherThreads: Int = 2,
-    val maxBatchSize: Int = 1000,
-    val maxFlushTime: Long = 1000,
-    @JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
-    @JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
-) {
-    @JsonIgnore
-    val certificate: Certificate? = clientCertificate?.run {
-        requireNotNull(certificatePrivateKey) {
-            "'${::clientCertificate.name}' setting requires '${::certificatePrivateKey.name}' setting to be set"
-        }
-
-        Certificate(clientCertificate, certificatePrivateKey)
-    }
-}
-
-private inline fun <reified T> load(defaultImpl: Class<out T>): T {
+inline fun <reified T> load(defaultImpl: Class<out T>): T {
     val instances = ServiceLoader.load(T::class.java).toList()
 
     return when (instances.size) {
