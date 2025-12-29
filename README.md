@@ -1,4 +1,4 @@
-# HTTP Client v2.3.2
+# HTTP Client v2.4.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
@@ -174,6 +174,10 @@ spec:
 ```
 
 ## Changelog
+
+### v2.4.0
+
+* TODO: write
 
 ### v2.3.2
 
