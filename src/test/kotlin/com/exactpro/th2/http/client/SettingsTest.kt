@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import strikt.api.expectThat
 import strikt.assertions.hasSize
 import strikt.assertions.isA
+import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
 import strikt.assertions.isFalse
 import strikt.assertions.isNotEmpty
@@ -90,6 +91,40 @@ class SettingsTest {
     }
 
     @Test
+    fun `get settings (empty)`() {
+        val settings = getSettings { _, mapper -> mapper.readValue("""
+            {
+                "host": "jsonplaceholder.typicode.com",
+                "sessionAlias": "client-http-1"
+            }
+        """.trimIndent()) }
+
+        expectThat(settings) {
+            get { useTransport }.isFalse()
+            get { maxBatchSize }.isEqualTo(1000)
+            get { maxFlushTime }.isEqualTo(1000)
+            // options after extension
+            get { sessions }.isNotEmpty() and {
+                hasSize(1)
+                get { get("client-http-1") }.isNotNull() and {
+                    get { https }.isFalse()
+                    get { host }.isEqualTo("jsonplaceholder.typicode.com")
+                    get { port }.isEqualTo(80)
+                    get { readTimeout }.isEqualTo(5000)
+                    get { maxParallelRequests }.isEqualTo(5)
+                    get { keepAliveTimeout }.isEqualTo(15000)
+                    get { defaultHeaders }.isEmpty()
+                    get { auth }.isNull()
+                    get { validateCertificates }.isTrue()
+                    get { clientCertificate }.isNull()
+                    get { certificatePrivateKey }.isNull()
+                    get { certificate }.isNull()
+                }
+            }
+        }
+    }
+
+    @Test
     fun `get multiple settings (default)`() {
         val settings = getSettings { _, mapper -> mapper.readValue("""
             {
@@ -113,12 +148,8 @@ class SettingsTest {
                 "clientCertificate": "src/test/resources/test.crt",
                 "certificatePrivateKey": "src/test/resources/test.key",
                 "sessions": {
-                    "client-http-1": {
-                        "host": "test-host-1"
-                    },
-                    "client-http-2": {
-                        "host": "test-host-2"
-                    }
+                    "client-http-1": {},
+                    "client-http-2": {}
                 }
             }
         """.trimIndent()) }
@@ -132,7 +163,7 @@ class SettingsTest {
                 hasSize(2)
                 get { get("client-http-1") }.isNotNull() and {
                     get { https }.isTrue()
-                    get { host }.isEqualTo("test-host-1")
+                    get { host }.isEqualTo("jsonplaceholder.typicode.com")
                     get { port }.isEqualTo(444)
                     get { readTimeout }.isEqualTo(5555)
                     get { maxParallelRequests }.isEqualTo(10)
@@ -152,7 +183,7 @@ class SettingsTest {
                 }
                 get { get("client-http-2") }.isNotNull() and {
                     get { https }.isTrue()
-                    get { host }.isEqualTo("test-host-2")
+                    get { host }.isEqualTo("jsonplaceholder.typicode.com")
                     get { port }.isEqualTo(444)
                     get { readTimeout }.isEqualTo(5555)
                     get { maxParallelRequests }.isEqualTo(10)
@@ -169,6 +200,42 @@ class SettingsTest {
                     get { clientCertificate }.isNotNull()
                     get { certificatePrivateKey }.isNotNull()
                     get { certificate }.isNotNull()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `get multiple settings (empty)`() {
+        val settings = getSettings { _, mapper -> mapper.readValue("""
+            {
+                "host": "jsonplaceholder.typicode.com",
+                "sessions": {
+                    "client-http-1": {}
+                }
+            }
+        """.trimIndent()) }
+
+        expectThat(settings) {
+            get { useTransport }.isFalse()
+            get { maxBatchSize }.isEqualTo(1000)
+            get { maxFlushTime }.isEqualTo(1000)
+            // options after extension
+            get { sessions }.isNotEmpty() and {
+                hasSize(1)
+                get { get("client-http-1") }.isNotNull() and {
+                    get { https }.isFalse()
+                    get { host }.isEqualTo("jsonplaceholder.typicode.com")
+                    get { port }.isEqualTo(80)
+                    get { readTimeout }.isEqualTo(5000)
+                    get { maxParallelRequests }.isEqualTo(5)
+                    get { keepAliveTimeout }.isEqualTo(15000)
+                    get { defaultHeaders }.isEmpty()
+                    get { auth }.isNull()
+                    get { validateCertificates }.isTrue()
+                    get { clientCertificate }.isNull()
+                    get { certificatePrivateKey }.isNull()
+                    get { certificate }.isNull()
                 }
             }
         }

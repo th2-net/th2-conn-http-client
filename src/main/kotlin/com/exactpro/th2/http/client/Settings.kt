@@ -33,7 +33,7 @@ import java.security.PrivateKey
 import java.security.cert.X509Certificate
 
 data class InternalSessionSettings(
-    val host: String,
+    val host: String? = null,
     val https: Boolean? = null,
     val port: Int? = null,
     val readTimeout: Int? = null,
@@ -123,10 +123,10 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
         maxFlushTime = settings.maxFlushTime,
         sessions = if (settings.sessions.isEmpty()) {
             val host = requireNotNull(settings.host) {
-                "'host' option can't null when 'sessions' option isn't specified"
+                "default 'host' option can't null when 'sessions' option isn't specified"
              }
             val alias = requireNotNull(settings.sessionAlias) {
-                "'sessionAlias' option can't null when 'sessions' option isn't specified"
+                "default 'sessionAlias' option can't null when 'sessions' option isn't specified"
             }
             mapOf(alias to SessionSettings(
                 https = settings.https,
@@ -142,10 +142,12 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
                 certificatePrivateKey = settings.certificatePrivateKey,
             ))
         } else {
-            settings.sessions.mapValues { (_, value) ->
+            settings.sessions.mapValues { (key, value) ->
                 SessionSettings(
                     https = value.https ?: settings.https,
-                    host = value.host,
+                    host = value.host ?: requireNotNull(settings.host) {
+                        "default 'host' option can't null because '$key' session hasn't got 'host' option"
+                    },
                     port = value.port ?: settings.port,
                     readTimeout = value.readTimeout ?: settings.readTimeout,
                     maxParallelRequests = value.maxParallelRequests ?: settings.maxParallelRequests,
