@@ -23,6 +23,7 @@ import com.exactpro.th2.common.grpc.MessageGroupBatch
 import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.schema.message.QueueAttribute.RAW
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.utils.event.EventBatcher
 import com.exactpro.th2.common.utils.event.storeEvent
@@ -71,9 +72,6 @@ class Application(
     factory: CommonFactory,
     private val registerResource: (name: String, destructor: () -> Unit) -> Unit,
 ) {
-    private val stateManager = load<IStateManager>(BasicStateManager::class.java)
-    private val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
-
     private val settings: Settings = getSettings(factory::getCustomConfiguration)
     private val eventRouter: MessageRouter<EventBatch> = factory.eventBatchRouter
     private val protoMR: MessageRouter<MessageGroupBatch> = factory.messageRouterMessageGroupBatch
@@ -93,8 +91,35 @@ class Application(
                 onBatch = eventRouter::send
             ).also { registerResource("event batcher", it::close) }
 
+            val onError: (Throwable) -> Unit = {
+                eventBatcher.storeEvent(rootEventId, "Batching problem: ${it.message}", "Message batching problem", it)
+            }
+
+            lateinit var transportMB: MessageBatcher
+            lateinit var protoMB: RawMessageBatcher
+            if (useTransport) {
+                transportMB =
+                    MessageBatcher(
+                        maxBatchSize,
+                        maxFlushTime,
+                        book,
+                        GROUP_SELECTOR,
+                        executor,
+                        onError,
+                        transportMR::send
+                    ).also { registerResource("transport message batcher", it::close) }
+            } else {
+                protoMB = RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
+                    protoMR.send(it, RAW.value)
+                }.also { registerResource("proto message batcher", it::close) }
+            }
+
             val aliasToService = mutableMapOf<String, Holder>()
             sessions.forEach { sessionAlias, sessionSettings ->
+                val stateManager = load<IStateManager>(BasicStateManager::class.java)
+                    .also { registerResource("state manager $sessionAlias", it::close) }
+                val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
+                    .also { registerResource("request handler $sessionAlias", it::close) }
                 val sessionGroup = sessionAlias
                 val clientEventId = Event.start()
                     .name("Client: $sessionAlias")
@@ -102,10 +127,6 @@ class Application(
                     .toBatchProto(rootEventId)
                     .also(eventRouter::send)
                     .getEvents(0).id
-
-                val onError: (Throwable) -> Unit = {
-                    eventBatcher.storeEvent(clientEventId, "Batching problem: ${it.message}", "Message batching problem", it)
-                }
 
                 // component supported multithreading sending via single http client.
                 // increment sequence and putting into message batcher should be executed atomically.
@@ -118,22 +139,10 @@ class Application(
                 val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit
 
                 if (useTransport) {
-                    val messageBatcher =
-                        MessageBatcher(
-                            maxBatchSize,
-                            maxFlushTime,
-                            book,
-                            GROUP_SELECTOR,
-                            executor,
-                            onError,
-                            transportMR::send
-                        )
-                            .also { registerResource("transport message batcher", it::close) }
-
                     onRequest = { request: RawHttpRequest ->
                         val rawMessage = outgoingLock.withLock {
                             request.toTransportMessage(sessionAlias, outgoingSequence()).also {
-                                messageBatcher.onMessage(it, sessionGroup)
+                                transportMB.onMessage(it, sessionGroup)
                             }
                         }
                         eventBatcher.storeEvent(
@@ -144,7 +153,7 @@ class Application(
                     }
                     onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
                         incomingLock.withLock {
-                            messageBatcher.onMessage(
+                            transportMB.onMessage(
                                 response.toTransportMessage(sessionAlias, incomingSequence(), request),
                                 sessionGroup
                             )
@@ -157,15 +166,10 @@ class Application(
                         .setSessionGroup(sessionGroup)
                         .build()
 
-                    val messageBatcher =
-                        RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
-                            protoMR.send(it, com.exactpro.th2.common.schema.message.QueueAttribute.RAW.value)
-                        }.also { registerResource("proto message batcher", it::close) }
-
                     onRequest = { request: RawHttpRequest ->
                         val rawMessage = outgoingLock.withLock {
                             request.toProtoMessage(connectionId, outgoingSequence())
-                                .also(messageBatcher::onMessage)
+                                .also(protoMB::onMessage)
                         }
                         eventBatcher.storeEvent(
                             if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId,
@@ -175,7 +179,7 @@ class Application(
                     }
                     onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
                         incomingLock.withLock {
-                            messageBatcher.onMessage(
+                            protoMB.onMessage(
                                 response.toProtoMessage(connectionId, incomingSequence(), request)
                             )
                         }
