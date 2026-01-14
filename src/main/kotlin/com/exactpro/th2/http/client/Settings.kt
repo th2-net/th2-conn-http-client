@@ -64,6 +64,7 @@ data class InternalSettings(
     @Deprecated("the parameter isn't used any more", level = DeprecationLevel.ERROR) val batcherThreads: Int = 2,
     val maxBatchSize: Int = 1000,
     val maxFlushTime: Long = 1000,
+    val publishSentEvents: Boolean = true,
     val sessions: Map<String, InternalSessionSettings> = emptyMap(),
 )
 
@@ -93,6 +94,7 @@ data class Settings(
     val useTransport: Boolean,
     val maxBatchSize: Int,
     val maxFlushTime: Long,
+    val publishSentEvents: Boolean,
     val sessions: Map<String, SessionSettings>,
 )
 
@@ -121,6 +123,7 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
         useTransport = settings.useTransport,
         maxBatchSize = settings.maxBatchSize,
         maxFlushTime = settings.maxFlushTime,
+        publishSentEvents = settings.publishSentEvents,
         sessions = if (settings.sessions.isEmpty()) {
             val host = requireNotNull(settings.host) {
                 "default 'host' option can't null when 'sessions' option isn't specified"

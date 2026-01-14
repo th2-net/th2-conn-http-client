@@ -54,6 +54,7 @@ class SettingsTest {
                 "useTransport": true,
                 "maxBatchSize": 1111,
                 "maxFlushTime": 2222,
+                "publishSentEvents": false,
                 "clientCertificate": "src/test/resources/test.crt",
                 "certificatePrivateKey": "src/test/resources/test.key"
             }
@@ -63,6 +64,7 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
+            get { publishSentEvents }.isFalse()
             // options after extension
             get { sessions }.isNotEmpty() and {
                 hasSize(1)
@@ -103,6 +105,7 @@ class SettingsTest {
             get { useTransport }.isFalse()
             get { maxBatchSize }.isEqualTo(1000)
             get { maxFlushTime }.isEqualTo(1000)
+            get { publishSentEvents }.isTrue()
             // options after extension
             get { sessions }.isNotEmpty() and {
                 hasSize(1)
@@ -145,6 +148,7 @@ class SettingsTest {
                 "useTransport": true,
                 "maxBatchSize": 1111,
                 "maxFlushTime": 2222,
+                "publishSentEvents": false,
                 "clientCertificate": "src/test/resources/test.crt",
                 "certificatePrivateKey": "src/test/resources/test.key",
                 "sessions": {
@@ -158,6 +162,7 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
+            get { publishSentEvents }.isFalse()
             // options after extension
             get { sessions }.isNotEmpty() and {
                 hasSize(2)
@@ -220,6 +225,7 @@ class SettingsTest {
             get { useTransport }.isFalse()
             get { maxBatchSize }.isEqualTo(1000)
             get { maxFlushTime }.isEqualTo(1000)
+            get { publishSentEvents }.isTrue()
             // options after extension
             get { sessions }.isNotEmpty() and {
                 hasSize(1)
@@ -248,6 +254,7 @@ class SettingsTest {
                 "useTransport": true,
                 "maxBatchSize": 1111,
                 "maxFlushTime": 2222,
+                "publishSentEvents": false,
                 "sessions": {
                     "client-http-1": {
                         "https": true,
@@ -291,6 +298,7 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
+            get { publishSentEvents }.isFalse()
             // options after extension
             get { sessions }.isNotEmpty() and {
                 hasSize(2)

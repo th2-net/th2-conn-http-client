@@ -11,6 +11,7 @@ Main configuration is done via setting following properties in a custom configur
 + **maxFlushTime** - max message batch flush time (`1000` by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api` or `null` by default).<br>
   This option is required when `sessions` option is missing in main config.
++ **publishSentEvents** - enables/disables publish of "message sent" events (`true` by default)
 + **sessions** - map session alias to session configuration (empty by default)
 
 ### Main / Sessions configuration
@@ -152,6 +153,7 @@ spec:
     useTransport: false
     maxBatchSize: 1000
     maxFlushTime: 1000
+    publishSentEvents: true
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
     auth:
@@ -185,7 +187,10 @@ spec:
 
 ### v2.4.0
 
++ [[GH-50] Attached message ids to send event](https://github.com/th2-net/th2-conn-http-client/issues/50)
+  + provided `publishSentEvents` option.
 + [[GH-44] Implemented multi-session feature](https://github.com/th2-net/th2-conn-http-client/issues/44)
+  + provided `sessions` option.
 + Updated:
   + th2 gradle plugin: `0.3.14` (bom: `4.14.3`)
   + kotlin: `2.3.0`

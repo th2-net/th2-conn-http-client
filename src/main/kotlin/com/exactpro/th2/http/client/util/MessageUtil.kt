@@ -171,6 +171,9 @@ fun TransportMessageGroup.toRequest(): RawHttpRequest = when (messages.size) {
     else -> error("Message group contains more than 2 messages")
 }
 
+val RawMessage.eventId: EventID?
+    get() = if (hasParentEventId()) parentEventId else null
+
 private sealed interface IRequest {
     val parentEventId: EventID?
     val metadata: Map<String, String>
