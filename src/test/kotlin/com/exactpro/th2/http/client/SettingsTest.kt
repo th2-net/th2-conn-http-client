@@ -20,6 +20,7 @@ import com.exactpro.th2.http.client.api.impl.BasicAuthSettings
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
+import strikt.assertions.all
 import strikt.assertions.hasSize
 import strikt.assertions.isA
 import strikt.assertions.isEmpty
@@ -64,10 +65,8 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
-            get { publishSentEvents }.isFalse()
             // options after extension
-            get { sessions }.isNotEmpty() and {
-                hasSize(1)
+            get { sessions }.hasSize(1) and {
                 get { get("client-http-1") }.isNotNull() and {
                     get { https }.isTrue()
                     get { host }.isEqualTo("jsonplaceholder.typicode.com")
@@ -87,6 +86,7 @@ class SettingsTest {
                     get { clientCertificate }.isNotNull()
                     get { certificatePrivateKey }.isNotNull()
                     get { certificate }.isNotNull()
+                    get { publishSentEvents }.isFalse()
                 }
             }
         }
@@ -105,10 +105,8 @@ class SettingsTest {
             get { useTransport }.isFalse()
             get { maxBatchSize }.isEqualTo(1000)
             get { maxFlushTime }.isEqualTo(1000)
-            get { publishSentEvents }.isTrue()
             // options after extension
-            get { sessions }.isNotEmpty() and {
-                hasSize(1)
+            get { sessions }.hasSize(1) and {
                 get { get("client-http-1") }.isNotNull() and {
                     get { https }.isFalse()
                     get { host }.isEqualTo("jsonplaceholder.typicode.com")
@@ -122,6 +120,7 @@ class SettingsTest {
                     get { clientCertificate }.isNull()
                     get { certificatePrivateKey }.isNull()
                     get { certificate }.isNull()
+                    get { publishSentEvents }.isTrue()
                 }
             }
         }
@@ -162,11 +161,9 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
-            get { publishSentEvents }.isFalse()
             // options after extension
-            get { sessions }.isNotEmpty() and {
-                hasSize(2)
-                get { get("client-http-1") }.isNotNull() and {
+            get { sessions }.hasSize(2) and {
+                get { values } all {
                     get { https }.isTrue()
                     get { host }.isEqualTo("jsonplaceholder.typicode.com")
                     get { port }.isEqualTo(444)
@@ -185,27 +182,10 @@ class SettingsTest {
                     get { clientCertificate }.isNotNull()
                     get { certificatePrivateKey }.isNotNull()
                     get { certificate }.isNotNull()
+                    get { publishSentEvents }.isFalse()
                 }
-                get { get("client-http-2") }.isNotNull() and {
-                    get { https }.isTrue()
-                    get { host }.isEqualTo("jsonplaceholder.typicode.com")
-                    get { port }.isEqualTo(444)
-                    get { readTimeout }.isEqualTo(5555)
-                    get { maxParallelRequests }.isEqualTo(10)
-                    get { keepAliveTimeout }.isEqualTo(15150)
-                    get { defaultHeaders }.isNotEmpty() and {
-                        hasSize(1)
-                        get { get("Content-Type") }.isEqualTo(listOf("application/json"))
-                    }
-                    get { auth }.isA<BasicAuthSettings>() and {
-                        get { username }.isEqualTo("test-username")
-                        get { password }.isEqualTo("test-password")
-                    }
-                    get { validateCertificates }.isFalse()
-                    get { clientCertificate }.isNotNull()
-                    get { certificatePrivateKey }.isNotNull()
-                    get { certificate }.isNotNull()
-                }
+                get { get("client-http-1") }.isNotNull()
+                get { get("client-http-2") }.isNotNull()
             }
         }
     }
@@ -225,10 +205,8 @@ class SettingsTest {
             get { useTransport }.isFalse()
             get { maxBatchSize }.isEqualTo(1000)
             get { maxFlushTime }.isEqualTo(1000)
-            get { publishSentEvents }.isTrue()
             // options after extension
-            get { sessions }.isNotEmpty() and {
-                hasSize(1)
+            get { sessions }.hasSize(1) and {
                 get { get("client-http-1") }.isNotNull() and {
                     get { https }.isFalse()
                     get { host }.isEqualTo("jsonplaceholder.typicode.com")
@@ -242,6 +220,7 @@ class SettingsTest {
                     get { clientCertificate }.isNull()
                     get { certificatePrivateKey }.isNull()
                     get { certificate }.isNull()
+                    get { publishSentEvents }.isTrue()
                 }
             }
         }
@@ -272,7 +251,8 @@ class SettingsTest {
                         },
                         "validateCertificates": true,
                         "clientCertificate": "src/test/resources/test.crt",
-                        "certificatePrivateKey": "src/test/resources/test.key"
+                        "certificatePrivateKey": "src/test/resources/test.key",
+                        "publishSentEvents": true
                     },
                     "client-http-2": {
                         "https": false,
@@ -298,10 +278,8 @@ class SettingsTest {
             get { useTransport }.isTrue()
             get { maxBatchSize }.isEqualTo(1111)
             get { maxFlushTime }.isEqualTo(2222)
-            get { publishSentEvents }.isFalse()
             // options after extension
-            get { sessions }.isNotEmpty() and {
-                hasSize(2)
+            get { sessions }.hasSize(2) and {
                 get { get("client-http-1") }.isNotNull() and {
                     get { https }.isTrue()
                     get { host }.isEqualTo("test-host-1")
@@ -321,6 +299,7 @@ class SettingsTest {
                     get { clientCertificate }.isNotNull()
                     get { certificatePrivateKey }.isNotNull()
                     get { certificate }.isNotNull()
+                    get { publishSentEvents }.isTrue()
                 }
                 get { get("client-http-2") }.isNotNull() and {
                     get { https }.isFalse()
@@ -341,6 +320,7 @@ class SettingsTest {
                     get { clientCertificate }.isNull()
                     get { certificatePrivateKey }.isNull()
                     get { certificate }.isNull()
+                    get { publishSentEvents }.isFalse()
                 }
             }
         }

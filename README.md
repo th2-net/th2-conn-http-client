@@ -11,7 +11,6 @@ Main configuration is done via setting following properties in a custom configur
 + **maxFlushTime** - max message batch flush time (`1000` by default)
 + **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api` or `null` by default).<br>
   This option is required when `sessions` option is missing in main config.
-+ **publishSentEvents** - enables/disables publish of "message sent" events (`true` by default)
 + **sessions** - map session alias to session configuration (empty by default)
 
 ### Main / Sessions configuration
@@ -32,6 +31,7 @@ When defined in main, they act as default values for all sessions, or as the par
 + **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers
   are not affected, empty by default)
 + **auth** - basic authentication settings (`null` by default)
++ **publishSentEvents** - enables/disables publish of "message sent" events (`true` by default)
 
 ### Authentication configuration
 

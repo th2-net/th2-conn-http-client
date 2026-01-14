@@ -44,6 +44,7 @@ data class InternalSessionSettings(
     val validateCertificates: Boolean? = null,
     @param:JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
     @param:JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
+    val publishSentEvents: Boolean? = null,
 )
 
 data class InternalSettings(
@@ -80,6 +81,7 @@ data class SessionSettings(
     val validateCertificates: Boolean,
     val clientCertificate: X509Certificate?,
     val certificatePrivateKey: PrivateKey?,
+    val publishSentEvents: Boolean,
 ) {
     val certificate: Certificate? = clientCertificate?.run {
         val key = requireNotNull(certificatePrivateKey) {
@@ -94,7 +96,6 @@ data class Settings(
     val useTransport: Boolean,
     val maxBatchSize: Int,
     val maxFlushTime: Long,
-    val publishSentEvents: Boolean,
     val sessions: Map<String, SessionSettings>,
 )
 
@@ -123,7 +124,6 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
         useTransport = settings.useTransport,
         maxBatchSize = settings.maxBatchSize,
         maxFlushTime = settings.maxFlushTime,
-        publishSentEvents = settings.publishSentEvents,
         sessions = if (settings.sessions.isEmpty()) {
             val host = requireNotNull(settings.host) {
                 "default 'host' option can't null when 'sessions' option isn't specified"
@@ -143,6 +143,7 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
                 validateCertificates = settings.validateCertificates,
                 clientCertificate = settings.clientCertificate,
                 certificatePrivateKey = settings.certificatePrivateKey,
+                publishSentEvents = settings.publishSentEvents,
             ))
         } else {
             settings.sessions.mapValues { (key, value) ->
@@ -160,6 +161,7 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
                     validateCertificates = value.validateCertificates ?: settings.validateCertificates,
                     clientCertificate = value.clientCertificate ?: settings.clientCertificate,
                     certificatePrivateKey = value.certificatePrivateKey ?: settings.certificatePrivateKey,
+                    publishSentEvents = value.publishSentEvents ?: settings.publishSentEvents,
                 )
             }
         }

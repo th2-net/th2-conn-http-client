@@ -130,7 +130,7 @@ class Application(
                             onError
                         ) { batch ->
                             transportMR.send(batch)
-                            if (!publishSentEvents) return@MessageBatcher
+                            if (!sessionSettings.publishSentEvents) return@MessageBatcher
                             eventBatcher.publishSentEvents(clientEventId, batch)
                         }.also { registerResource("transport message batcher $sessionAlias", it::close) }
 
@@ -159,7 +159,7 @@ class Application(
                         onError
                     ) { batch ->
                         protoMR.send(batch, RAW.value)
-                        if (!publishSentEvents) return@RawMessageBatcher
+                        if (!sessionSettings.publishSentEvents) return@RawMessageBatcher
                         eventBatcher.publishSentEvents(clientEventId, batch)
                     }.also { registerResource("proto message batcher $sessionAlias", it::close) }
                     val connectionId = com.exactpro.th2.common.grpc.ConnectionID.newBuilder()
