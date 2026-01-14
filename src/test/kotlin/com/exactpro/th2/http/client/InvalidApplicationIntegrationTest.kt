@@ -16,11 +16,9 @@
 
 package com.exactpro.th2.http.client
 
-import com.exactpro.th2.common.grpc.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.EventStatus
-import com.exactpro.th2.common.schema.box.configuration.BoxConfiguration.DEFAULT_BOOK_NAME
 import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.Direction
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.EventId
@@ -52,7 +50,6 @@ import strikt.assertions.all
 import strikt.assertions.any
 import strikt.assertions.isEmpty
 import strikt.assertions.isEqualTo
-import strikt.assertions.isFalse
 import strikt.assertions.isNotNull
 import strikt.assertions.matches
 import strikt.assertions.single
@@ -72,7 +69,7 @@ class InvalidApplicationIntegrationTest {
             "port": 8080,
             "sessionAlias": "some_api",
             "validateCertificates": false,
-            "sessionAlias": "test-session-alias",
+            "sessionAlias": "$SESSION_ALIAS_TEST",
             "useTransport": true
         }
         """.trimIndent()
@@ -114,32 +111,16 @@ class InvalidApplicationIntegrationTest {
         }
 
         val rootEventId: EventID = eventListener.assertRootEvent().id
-
         application.start()
+        val clientEventId: EventID = eventListener.assertClientEvent(rootEventId, SESSION_ALIAS_TEST).id
 
         testFactory.sendMessages(RawMessage.builder().apply {
             idBuilder()
-                .setSessionAlias("test-session-alias")
+                .setSessionAlias(SESSION_ALIAS_TEST)
                 .setTimestamp(Instant.now())
                 .setDirection(Direction.OUTGOING)
                 .setSequence(1)
         }.build())
-
-        val batch = assertNotNull(eventListener.poll(ofSeconds(2)), "Client event is null")
-        expectThat(batch) {
-            get { eventsList }.single().and {
-                get { name }.isEqualTo("Client: test-session-alias")
-                get { type }.isEqualTo("ClientEvent")
-                get { status }.isEqualTo(EventStatus.SUCCESS)
-                get { id }.and {
-                    get { bookName }.isEqualTo(rootEventId.bookName)
-                    get { scope }.isEqualTo(rootEventId.scope)
-                }
-                get { parentId }.isEqualTo(rootEventId)
-                get { attachedMessageIdsList }.isEmpty()
-                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
-            }
-        }
 
         expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
             .get { eventsList }.single().and {
@@ -150,7 +131,7 @@ class InvalidApplicationIntegrationTest {
                     get { bookName }.isEqualTo(rootEventId.bookName)
                     get { scope }.isEqualTo(rootEventId.scope)
                 }
-                get { parentId }.isEqualTo(batch.eventsList.single().id)
+                get { parentId }.isEqualTo(clientEventId)
                 get { attachedMessageIdsList }.isEmpty()
                 get { body.toString(Charsets.UTF_8) }.matches(Regex("""
                     \[\{"data":"java\.net\.ConnectException: Connection refused( \(Connection refused\))?","type":"message"}]
@@ -172,8 +153,8 @@ class InvalidApplicationIntegrationTest {
         }
 
         val rootEventId = eventListener.assertRootEvent().id
-
         application.start()
+        eventListener.assertClientEvent(rootEventId, SESSION_ALIAS_TEST)
 
         val eventId = EventId.builder()
             .setBook(BOOK_TEST)
@@ -184,26 +165,12 @@ class InvalidApplicationIntegrationTest {
 
         testFactory.sendMessages(RawMessage.builder().apply {
             idBuilder()
-                .setSessionAlias("test-session-alias")
+                .setSessionAlias(SESSION_ALIAS_TEST)
                 .setTimestamp(Instant.now())
                 .setDirection(Direction.OUTGOING)
                 .setSequence(1)
             setEventId(eventId)
         }.build())
-
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
-            .get { eventsList }.single().and {
-                get { name }.isEqualTo("Client: test-session-alias")
-                get { type }.isEqualTo("ClientEvent")
-                get { status }.isEqualTo(EventStatus.SUCCESS)
-                get { id }.and {
-                    get { bookName }.isEqualTo(rootEventId.bookName)
-                    get { scope }.isEqualTo(rootEventId.scope)
-                }
-                get { parentId }.isEqualTo(rootEventId)
-                get { attachedMessageIdsList }.isEmpty()
-                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
-            }
 
         expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
             .get { eventsList }.single().and {
@@ -236,8 +203,8 @@ class InvalidApplicationIntegrationTest {
         }
 
         val rootEventId = eventListener.assertRootEvent().id
-
         application.start()
+        eventListener.assertClientEvent(rootEventId, SESSION_ALIAS_TEST)
 
         val eventIdA = EventId.builder()
             .setBook(BOOK_TEST)
@@ -256,7 +223,7 @@ class InvalidApplicationIntegrationTest {
         testFactory.sendMessages(
             RawMessage.builder().apply {
                 idBuilder()
-                    .setSessionAlias("test-session-alias")
+                    .setSessionAlias(SESSION_ALIAS_TEST)
                     .setTimestamp(Instant.now())
                     .setDirection(Direction.OUTGOING)
                     .setSequence(1)
@@ -264,28 +231,13 @@ class InvalidApplicationIntegrationTest {
             }.build(),
             RawMessage.builder().apply {
                 idBuilder()
-                    .setSessionAlias("test-session-alias")
+                    .setSessionAlias(SESSION_ALIAS_TEST)
                     .setTimestamp(Instant.now())
                     .setDirection(Direction.OUTGOING)
                     .setSequence(1)
                 setEventId(eventIdB)
             }.build(),
         )
-
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
-            get { eventsList }.single().and {
-                get { name }.isEqualTo("Client: test-session-alias")
-                get { type }.isEqualTo("ClientEvent")
-                get { status }.isEqualTo(EventStatus.SUCCESS)
-                get { id }.and {
-                    get { bookName }.isEqualTo(rootEventId.bookName)
-                    get { scope }.isEqualTo(rootEventId.scope)
-                }
-                get { parentId }.isEqualTo(rootEventId)
-                get { attachedMessageIdsList }.isEmpty()
-                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
-            }
-        }
 
         val events = listOf(
             assertNotNull(eventListener.poll(ofSeconds(2))),
@@ -334,29 +286,12 @@ class InvalidApplicationIntegrationTest {
         )
     }
 
-    private fun CollectorMessageListener<EventBatch>.assertRootEvent() =
-        assertNotNull(poll(ofSeconds(1))).also {
-            expectThat(it) {
-                get { eventsList }.single().isRootEvent(DEFAULT_BOOK_NAME, "app")
-            }
-        }.getEvents(0)
-
     companion object {
         private const val BOOK_TEST = "test-book-A"
         private const val SCOPE_TEST_A = "test-scope-A"
         private const val SCOPE_TEST_B = "test-scope-B"
+        private const val SESSION_ALIAS_TEST = "test-session-alias"
         private const val SESSION_GROUP_TEST = "test-session-group"
-
-        fun Assertion.Builder<Event>.isRootEvent(book: String, scope: String) {
-            get { id }.and {
-                get { bookName }.isEqualTo(book)
-                get { getScope() }.isEqualTo(scope)
-            }
-            get { hasParentId() }.isFalse()
-            get { name }.matches(Regex("$scope \\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z) - Root event"))
-            get { type }.isEqualTo("Microservice")
-            get { status }.isEqualTo(EventStatus.SUCCESS)
-        }
 
         fun Assertion.Builder<EventBatch>.isIdEqualTo(eventId: EventId) {
             get { eventsList }.single().and {
