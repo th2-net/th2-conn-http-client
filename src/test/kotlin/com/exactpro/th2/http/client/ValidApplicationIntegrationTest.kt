@@ -93,7 +93,8 @@ class ValidApplicationIntegrationTest {
                     "host": "$SERVER_HOST",
                     "port": $SERVER_PORT,
                     "validateCertificates": false,
-                    "maxParallelRequests": $MAX_PARALLEL_REQUESTS
+                    "maxParallelRequests": $MAX_PARALLEL_REQUESTS,
+                    "publishSentEvents": false
                 }
             }
         }
@@ -191,12 +192,13 @@ class ValidApplicationIntegrationTest {
     @Timeout(30)
     @ParameterizedTest
     @CsvSource(
-        "$SESSION_ALIAS_1_TEST,$SESSION_GROUP_1_TEST",
-        "$SESSION_ALIAS_2_TEST,$SESSION_GROUP_2_TEST",
+        "$SESSION_ALIAS_1_TEST,$SESSION_GROUP_1_TEST,true",
+        "$SESSION_ALIAS_2_TEST,$SESSION_GROUP_2_TEST,false",
     )
     fun `send message with parent event id test`(
         sessionAlias: String,
         sessionGroup: String,
+        publishSentEvents: Boolean,
         @Th2TestFactory testFactory: CommonFactory,
         @Th2AppFactory appFactory: CommonFactory,
         resources: CleanupExtension.Registry,
@@ -287,32 +289,37 @@ class ValidApplicationIntegrationTest {
         val rootEventId: EventID = eventListener.assertRootEvent().id
         eventListener.assertClientEvent(rootEventId, SESSION_ALIAS_1_TEST)
         eventListener.assertClientEvent(rootEventId, SESSION_ALIAS_2_TEST)
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
-            get { this.eventsList }.single().and {
-                get { this.name }.isEqualTo("Sent HTTP request")
-                get { this.type }.isEqualTo("Send message")
-                get { this.status }.isEqualTo(EventStatus.SUCCESS)
-                get { this.id }.and {
-                    get { this.bookName }.isEqualTo(eventId.book)
-                    get { this.scope }.isEqualTo(eventId.scope)
+        if (publishSentEvents) {
+            expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
+                get { this.eventsList }.single().and {
+                    get { this.name }.isEqualTo("Sent HTTP request")
+                    get { this.type }.isEqualTo("Send message")
+                    get { this.status }.isEqualTo(EventStatus.SUCCESS)
+                    get { this.id }.and {
+                        get { this.bookName }.isEqualTo(eventId.book)
+                        get { this.scope }.isEqualTo(eventId.scope)
+                    }
+                    get { this.parentId }.isEqualTo(eventId.toProto())
+                    get { this.attachedMessageIdsList }.single() isEqualTo group.groups.first().messages.first().id.toProto(
+                        group
+                    )
+                    get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
                 }
-                get { this.parentId }.isEqualTo(eventId.toProto())
-                get { this.attachedMessageIdsList }.single() isEqualTo group.groups.first().messages.first().id.toProto(group)
-                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
             }
         }
-        assertNull(eventListener.poll(ofSeconds(1)), "Empty event")
+        assertNull(eventListener.poll(ofSeconds(1)), "No event")
     }
 
     @Timeout(30)
     @ParameterizedTest
     @CsvSource(
-        "$SESSION_ALIAS_1_TEST,$SESSION_GROUP_1_TEST",
-        "$SESSION_ALIAS_2_TEST,$SESSION_GROUP_2_TEST",
+        "$SESSION_ALIAS_1_TEST,$SESSION_GROUP_1_TEST,true",
+        "$SESSION_ALIAS_2_TEST,$SESSION_GROUP_2_TEST,false",
     )
     fun `send message without parent event id test`(
         sessionAlias: String,
         sessionGroup: String,
+        publishSentEvents: Boolean,
         @Th2TestFactory testFactory: CommonFactory,
         @Th2AppFactory appFactory: CommonFactory,
         resources: CleanupExtension.Registry,
@@ -391,22 +398,26 @@ class ValidApplicationIntegrationTest {
         val aliasToEventId = listOf(SESSION_ALIAS_1_TEST, SESSION_ALIAS_2_TEST)
             .associateWith { eventListener.assertClientEvent(rootEventId, it).id }
 
-        val eventId = assertNotNull(aliasToEventId[sessionAlias], "Client event id")
-        expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
-            get { this.eventsList }.single().and {
-                get { this.name }.isEqualTo("Sent HTTP request")
-                get { this.type }.isEqualTo("Send message")
-                get { this.status }.isEqualTo(EventStatus.SUCCESS)
-                get { this.id }.and {
-                    get { this.bookName }.isEqualTo(eventId.bookName)
-                    get { this.scope }.isEqualTo(eventId.scope)
+        if (publishSentEvents) {
+            val eventId = assertNotNull(aliasToEventId[sessionAlias], "Client event id")
+            expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
+                get { this.eventsList }.single().and {
+                    get { this.name }.isEqualTo("Sent HTTP request")
+                    get { this.type }.isEqualTo("Send message")
+                    get { this.status }.isEqualTo(EventStatus.SUCCESS)
+                    get { this.id }.and {
+                        get { this.bookName }.isEqualTo(eventId.bookName)
+                        get { this.scope }.isEqualTo(eventId.scope)
+                    }
+                    get { this.parentId }.isEqualTo(eventId)
+                    get { this.attachedMessageIdsList }.single() isEqualTo group.groups.first().messages.first().id.toProto(
+                        group
+                    )
+                    get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
                 }
-                get { this.parentId }.isEqualTo(eventId)
-                get { this.attachedMessageIdsList }.single() isEqualTo group.groups.first().messages.first().id.toProto(group)
-                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
             }
         }
-        assertNull(eventListener.poll(ofSeconds(1)), "Empty event")
+        assertNull(eventListener.poll(ofSeconds(1)), "No event")
     }
 
     companion object {
