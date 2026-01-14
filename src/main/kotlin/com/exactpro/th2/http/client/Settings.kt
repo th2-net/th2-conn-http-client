@@ -44,6 +44,7 @@ data class InternalSessionSettings(
     val validateCertificates: Boolean? = null,
     @param:JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
     @param:JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
+    val publishSentEvents: Boolean? = null,
 )
 
 data class InternalSettings(
@@ -64,6 +65,7 @@ data class InternalSettings(
     @Deprecated("the parameter isn't used any more", level = DeprecationLevel.ERROR) val batcherThreads: Int = 2,
     val maxBatchSize: Int = 1000,
     val maxFlushTime: Long = 1000,
+    val publishSentEvents: Boolean = true,
     val sessions: Map<String, InternalSessionSettings> = emptyMap(),
 )
 
@@ -79,6 +81,7 @@ data class SessionSettings(
     val validateCertificates: Boolean,
     val clientCertificate: X509Certificate?,
     val certificatePrivateKey: PrivateKey?,
+    val publishSentEvents: Boolean,
 ) {
     val certificate: Certificate? = clientCertificate?.run {
         val key = requireNotNull(certificatePrivateKey) {
@@ -140,6 +143,7 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
                 validateCertificates = settings.validateCertificates,
                 clientCertificate = settings.clientCertificate,
                 certificatePrivateKey = settings.certificatePrivateKey,
+                publishSentEvents = settings.publishSentEvents,
             ))
         } else {
             settings.sessions.mapValues { (key, value) ->
@@ -157,6 +161,7 @@ fun getSettings(getFunc: (Class<InternalSettings>, ObjectMapper) -> InternalSett
                     validateCertificates = value.validateCertificates ?: settings.validateCertificates,
                     clientCertificate = value.clientCertificate ?: settings.clientCertificate,
                     certificatePrivateKey = value.certificatePrivateKey ?: settings.certificatePrivateKey,
+                    publishSentEvents = value.publishSentEvents ?: settings.publishSentEvents,
                 )
             }
         }

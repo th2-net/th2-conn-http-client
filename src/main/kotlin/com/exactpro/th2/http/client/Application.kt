@@ -26,7 +26,6 @@ import com.exactpro.th2.common.schema.message.MessageRouter
 import com.exactpro.th2.common.schema.message.QueueAttribute.RAW
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.utils.event.EventBatcher
-import com.exactpro.th2.common.utils.event.storeEvent
 import com.exactpro.th2.common.utils.event.transport.toProto
 import com.exactpro.th2.common.utils.message.RAW_GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
@@ -42,6 +41,8 @@ import com.exactpro.th2.http.client.api.IStateManager
 import com.exactpro.th2.http.client.api.IStateManager.StateManagerContext
 import com.exactpro.th2.http.client.api.impl.BasicRequestHandler
 import com.exactpro.th2.http.client.api.impl.BasicStateManager
+import com.exactpro.th2.http.client.util.publishSentEvents
+import com.exactpro.th2.http.client.util.storeEvent
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toProtoMessage
 import com.exactpro.th2.http.client.util.toTransportMessage
@@ -91,29 +92,6 @@ class Application(
                 onBatch = eventRouter::send
             ).also { registerResource("event batcher", it::close) }
 
-            val onError: (Throwable) -> Unit = {
-                eventBatcher.storeEvent(rootEventId, "Batching problem: ${it.message}", "Message batching problem", it)
-            }
-
-            lateinit var transportMB: MessageBatcher
-            lateinit var protoMB: RawMessageBatcher
-            if (useTransport) {
-                transportMB =
-                    MessageBatcher(
-                        maxBatchSize,
-                        maxFlushTime,
-                        book,
-                        GROUP_SELECTOR,
-                        executor,
-                        onError,
-                        transportMR::send
-                    ).also { registerResource("transport message batcher", it::close) }
-            } else {
-                protoMB = RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
-                    protoMR.send(it, RAW.value)
-                }.also { registerResource("proto message batcher", it::close) }
-            }
-
             val aliasToService = mutableMapOf<String, Holder>()
             sessions.forEach { sessionAlias, sessionSettings ->
                 val stateManager = load<IStateManager>(BasicStateManager::class.java)
@@ -138,18 +116,30 @@ class Application(
                 val onRequest: (RawHttpRequest) -> Unit
                 val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit
 
+                val onError: (Throwable) -> Unit = {
+                    eventBatcher.storeEvent(clientEventId, "Batching problem: ${it.message}", "Message batching problem", it)
+                }
+
                 if (useTransport) {
+                    val transportMB = MessageBatcher(
+                            maxBatchSize,
+                            maxFlushTime,
+                            book,
+                            GROUP_SELECTOR,
+                            executor,
+                            onError
+                        ) { batch ->
+                            transportMR.send(batch)
+                            if (!sessionSettings.publishSentEvents) return@MessageBatcher
+                            eventBatcher.publishSentEvents(clientEventId, batch)
+                        }.also { registerResource("transport message batcher $sessionAlias", it::close) }
+
                     onRequest = { request: RawHttpRequest ->
-                        val rawMessage = outgoingLock.withLock {
+                        outgoingLock.withLock {
                             request.toTransportMessage(sessionAlias, outgoingSequence()).also {
                                 transportMB.onMessage(it, sessionGroup)
                             }
                         }
-                        eventBatcher.storeEvent(
-                            rawMessage.eventId?.toProto() ?: rootEventId,
-                            "Sent HTTP request",
-                            "Send message"
-                        )
                     }
                     onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
                         incomingLock.withLock {
@@ -161,21 +151,27 @@ class Application(
                         stateManager.onResponse(response)
                     }
                 } else {
+                    val protoMB = RawMessageBatcher(
+                        maxBatchSize,
+                        maxFlushTime,
+                        RAW_GROUP_SELECTOR,
+                        executor,
+                        onError
+                    ) { batch ->
+                        protoMR.send(batch, RAW.value)
+                        if (!sessionSettings.publishSentEvents) return@RawMessageBatcher
+                        eventBatcher.publishSentEvents(clientEventId, batch)
+                    }.also { registerResource("proto message batcher $sessionAlias", it::close) }
                     val connectionId = com.exactpro.th2.common.grpc.ConnectionID.newBuilder()
                         .setSessionAlias(sessionAlias)
                         .setSessionGroup(sessionGroup)
                         .build()
 
                     onRequest = { request: RawHttpRequest ->
-                        val rawMessage = outgoingLock.withLock {
+                        outgoingLock.withLock {
                             request.toProtoMessage(connectionId, outgoingSequence())
                                 .also(protoMB::onMessage)
                         }
-                        eventBatcher.storeEvent(
-                            if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId,
-                            "Sent HTTP request",
-                            "Send message"
-                        )
                     }
                     onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
                         incomingLock.withLock {

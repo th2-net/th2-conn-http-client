@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 Exactpro (Exactpro Systems Limited)
+ * Copyright 2020-2026 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -170,6 +170,9 @@ fun TransportMessageGroup.toRequest(): RawHttpRequest = when (messages.size) {
 
     else -> error("Message group contains more than 2 messages")
 }
+
+val RawMessage.eventId: EventID?
+    get() = if (hasParentEventId()) parentEventId else null
 
 private sealed interface IRequest {
     val parentEventId: EventID?

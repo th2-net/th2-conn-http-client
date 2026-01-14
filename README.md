@@ -31,6 +31,7 @@ When defined in main, they act as default values for all sessions, or as the par
 + **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers
   are not affected, empty by default)
 + **auth** - basic authentication settings (`null` by default)
++ **publishSentEvents** - enables/disables publish of "message sent" events (`true` by default)
 
 ### Authentication configuration
 
@@ -152,6 +153,7 @@ spec:
     useTransport: false
     maxBatchSize: 1000
     maxFlushTime: 1000
+    publishSentEvents: true
     defaultHeaders:
       x-api-key: [ 'apikeywashere' ]
     auth:
@@ -185,7 +187,10 @@ spec:
 
 ### v2.4.0
 
++ [[GH-50] Attached message ids to send event](https://github.com/th2-net/th2-conn-http-client/issues/50)
+  + provided `publishSentEvents` option.
 + [[GH-44] Implemented multi-session feature](https://github.com/th2-net/th2-conn-http-client/issues/44)
+  + provided `sessions` option.
 + Updated:
   + th2 gradle plugin: `0.3.14` (bom: `4.14.3`)
   + kotlin: `2.3.0`
