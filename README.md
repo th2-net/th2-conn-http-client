@@ -1,10 +1,22 @@
-# HTTP Client v2.3.2
+# HTTP Client v2.4.0
 
 This microservice allows performing HTTP requests and receive HTTP responses. It also can perform basic authentication
 
 ## Configuration
 
 Main configuration is done via setting following properties in a custom configuration:
+
++ **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`true` by default)
++ **maxBatchSize** - max size of outgoing message batch (`1000` by default)
++ **maxFlushTime** - max message batch flush time (`1000` by default)
++ **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api` or `null` by default).<br>
+  This option is required when `sessions` option is missing in main config.
++ **sessions** - map session alias to session configuration (empty by default)
+
+### Main / Sessions configuration
+
+The options below can be specified either in the main block or in `sessions` blocks.
+When defined in main, they act as default values for all sessions, or as the parameters for a single session when `sessionAlias` is specified and `sessions` is not.
 
 + **https** - enables HTTPS (`false` by default)
 + **host** - host for HTTP requests (e.g. `google.com`)
@@ -18,12 +30,7 @@ Main configuration is done via setting following properties in a custom configur
   default)
 + **defaultHeaders** - map of default headers, and their values which will be applied to each request (existing headers
   are not affected, empty by default)
-+ **sessionAlias** - session alias for incoming/outgoing TH2 messages (e.g. `rest_api`)
 + **auth** - basic authentication settings (`null` by default)
-+ **useTransport** - use th2 transport or protobuf protocol to publish incoming/outgoing messages (`true` by default)
-+ **batcherThreads** - amount of event/message batcher threads (`2` by default)
-+ **maxBatchSize** - max size of outgoing message batch (`1000` by default)
-+ **maxFlushTime** - max message batch flush time (`1000` by default)
 
 ### Authentication configuration
 
@@ -143,7 +150,6 @@ spec:
     clientCertificate: /secret/storage/cert.crt
     certificatePrivateKey: /secret/storage/private.key
     useTransport: false
-    batcherThreads: 2
     maxBatchSize: 1000
     maxFlushTime: 1000
     defaultHeaders:
@@ -176,6 +182,15 @@ spec:
 ```
 
 ## Changelog
+
+### v2.4.0
+
++ [[GH-44] Implemented multi-session feature](https://github.com/th2-net/th2-conn-http-client/issues/44)
++ Updated:
+  + th2 gradle plugin: `0.3.14` (bom: `4.14.3`)
+  + kotlin: `2.3.0`
+  + kotlin-logging: `7.0.14`
+  + common: `5.17.1-dev`
 
 ### v2.3.2
 

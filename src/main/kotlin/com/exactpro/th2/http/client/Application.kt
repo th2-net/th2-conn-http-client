@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2026 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@
 
 package com.exactpro.th2.http.client
 
+import com.exactpro.th2.common.event.Event
 import com.exactpro.th2.common.grpc.EventBatch
 import com.exactpro.th2.common.grpc.EventID
 import com.exactpro.th2.common.grpc.MessageGroupBatch
 import com.exactpro.th2.common.schema.factory.CommonFactory
 import com.exactpro.th2.common.schema.message.MessageListener
 import com.exactpro.th2.common.schema.message.MessageRouter
+import com.exactpro.th2.common.schema.message.QueueAttribute.RAW
 import com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.GroupBatch
 import com.exactpro.th2.common.utils.event.EventBatcher
 import com.exactpro.th2.common.utils.event.storeEvent
@@ -29,38 +31,24 @@ import com.exactpro.th2.common.utils.event.transport.toProto
 import com.exactpro.th2.common.utils.message.RAW_GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.RawMessageBatcher
 import com.exactpro.th2.common.utils.message.parentEventIds
+import com.exactpro.th2.common.utils.message.sessionAlias
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher
 import com.exactpro.th2.common.utils.message.transport.MessageBatcher.Companion.GROUP_SELECTOR
 import com.exactpro.th2.common.utils.message.transport.eventIds
 import com.exactpro.th2.common.utils.shutdownGracefully
-import com.exactpro.th2.http.client.api.IAuthSettings
-import com.exactpro.th2.http.client.api.IAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.IRequestHandler
 import com.exactpro.th2.http.client.api.IRequestHandler.RequestHandlerContext
 import com.exactpro.th2.http.client.api.IStateManager
 import com.exactpro.th2.http.client.api.IStateManager.StateManagerContext
-import com.exactpro.th2.http.client.api.impl.AuthSettingsDeserializer
-import com.exactpro.th2.http.client.api.impl.BasicAuthSettingsTypeProvider
 import com.exactpro.th2.http.client.api.impl.BasicRequestHandler
 import com.exactpro.th2.http.client.api.impl.BasicStateManager
-import com.exactpro.th2.http.client.util.Certificate
-import com.exactpro.th2.http.client.util.CertificateConverter
-import com.exactpro.th2.http.client.util.PrivateKeyConverter
 import com.exactpro.th2.http.client.util.toPrettyString
 import com.exactpro.th2.http.client.util.toProtoMessage
 import com.exactpro.th2.http.client.util.toTransportMessage
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.json.JsonMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
-import com.fasterxml.jackson.module.kotlin.KotlinFeature
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import rawhttp.core.RawHttpRequest
 import rawhttp.core.RawHttpResponse
-import java.security.PrivateKey
-import java.security.cert.X509Certificate
 import java.time.Instant
 import java.util.ServiceLoader
 import java.util.concurrent.ExecutorService
@@ -74,61 +62,28 @@ private const val SEND_PIN_ATTRIBUTE = "send"
 internal const val INPUT_QUEUE_TRANSPORT_ATTRIBUTE = SEND_PIN_ATTRIBUTE
 private val INPUT_QUEUE_PROTO_ATTRIBUTES = arrayOf(SEND_PIN_ATTRIBUTE, "group")
 
+private data class Holder(
+    val service: ExecutorService,
+    val handler: IRequestHandler,
+    val clientEventId: EventID,
+)
+
 class Application(
     factory: CommonFactory,
     private val registerResource: (name: String, destructor: () -> Unit) -> Unit,
 ) {
-    private val stateManager = load<IStateManager>(BasicStateManager::class.java)
-    private val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
-    private val authSettingsType = load<IAuthSettingsTypeProvider>(BasicAuthSettingsTypeProvider::class.java).type
-
-    private val settings: Settings
+    private val settings: Settings = getSettings(factory::getCustomConfiguration)
     private val eventRouter: MessageRouter<EventBatch> = factory.eventBatchRouter
     private val protoMR: MessageRouter<MessageGroupBatch> = factory.messageRouterMessageGroupBatch
     private val transportMR: MessageRouter<GroupBatch> = factory.transportGroupBatchRouter
     private val rootEventId: EventID = factory.rootEventId
 
-    init {
-        val mapper = JsonMapper.builder()
-            .addModule(
-                KotlinModule.Builder()
-                    .withReflectionCacheSize(512)
-                    .configure(KotlinFeature.NullToEmptyCollection, false)
-                    .configure(KotlinFeature.NullToEmptyMap, false)
-                    .configure(KotlinFeature.NullIsSameAsDefault, true)
-                    .configure(KotlinFeature.SingletonSupport, true)
-                    .configure(KotlinFeature.StrictNullChecks, false)
-                    .build()
-            )
-            .addModule(
-                SimpleModule().addDeserializer(
-                    IAuthSettings::class.java,
-                    AuthSettingsDeserializer(authSettingsType)
-                )
-            )
-            .build()
-
-        settings = factory.getCustomConfiguration(Settings::class.java, mapper)
-    }
-
     fun start() {
-        // component supported multithreading sending via single http client.
-        // increment sequence and putting into message batcher should be executed atomically.
-        val incomingLock = ReentrantLock()
-        val outgoingLock = ReentrantLock()
-        val incomingSequence = createSequence()
-        val outgoingSequence = createSequence()
-
-        val onRequest: (RawHttpRequest) -> Unit
-        val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit
-
         val executor = Executors.newSingleThreadScheduledExecutor()
         registerResource("message batch executor") { executor.shutdownGracefully() }
 
+        val book = rootEventId.bookName
         with(settings) {
-            val book = rootEventId.bookName
-            val sessionGroup = sessionAlias
-
             val eventBatcher = EventBatcher(
                 maxBatchSizeInItems = maxBatchSize,
                 executor = executor,
@@ -140,114 +95,171 @@ class Application(
                 eventBatcher.storeEvent(rootEventId, "Batching problem: ${it.message}", "Message batching problem", it)
             }
 
+            lateinit var transportMB: MessageBatcher
+            lateinit var protoMB: RawMessageBatcher
             if (useTransport) {
-                val messageBatcher =
-                    MessageBatcher(maxBatchSize, maxFlushTime, book, GROUP_SELECTOR, executor, onError, transportMR::send)
-                        .also { registerResource("transport message batcher", it::close) }
-
-                onRequest = { request: RawHttpRequest ->
-                    val rawMessage = outgoingLock.withLock {
-                        request.toTransportMessage(sessionAlias, outgoingSequence()).also {
-                            messageBatcher.onMessage(it, sessionGroup)
-                        }
-                    }
-                    eventBatcher.storeEvent(
-                        rawMessage.eventId?.toProto() ?: rootEventId,
-                        "Sent HTTP request",
-                        "Send message"
-                    )
-                }
-                onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-                    incomingLock.withLock {
-                        messageBatcher.onMessage(
-                            response.toTransportMessage(sessionAlias, incomingSequence(), request),
-                            sessionGroup
-                        )
-                    }
-                    stateManager.onResponse(response)
-                }
+                transportMB =
+                    MessageBatcher(
+                        maxBatchSize,
+                        maxFlushTime,
+                        book,
+                        GROUP_SELECTOR,
+                        executor,
+                        onError,
+                        transportMR::send
+                    ).also { registerResource("transport message batcher", it::close) }
             } else {
-                val connectionId = com.exactpro.th2.common.grpc.ConnectionID.newBuilder()
-                    .setSessionAlias(sessionAlias)
-                    .setSessionGroup(sessionGroup)
-                    .build()
-
-                val messageBatcher = RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
-                    protoMR.send(it, com.exactpro.th2.common.schema.message.QueueAttribute.RAW.value)
+                protoMB = RawMessageBatcher(maxBatchSize, maxFlushTime, RAW_GROUP_SELECTOR, executor, onError) {
+                    protoMR.send(it, RAW.value)
                 }.also { registerResource("proto message batcher", it::close) }
+            }
 
-                onRequest = { request: RawHttpRequest ->
-                    val rawMessage = outgoingLock.withLock {
-                        request.toProtoMessage(connectionId, outgoingSequence())
-                            .also(messageBatcher::onMessage)
-                    }
-                    eventBatcher.storeEvent(
-                        if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId,
-                        "Sent HTTP request",
-                        "Send message"
-                    )
-                }
-                onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
-                    incomingLock.withLock {
-                        messageBatcher.onMessage(
-                            response.toProtoMessage(connectionId, incomingSequence(), request)
+            val aliasToService = mutableMapOf<String, Holder>()
+            sessions.forEach { sessionAlias, sessionSettings ->
+                val stateManager = load<IStateManager>(BasicStateManager::class.java)
+                    .also { registerResource("state manager $sessionAlias", it::close) }
+                val requestHandler = load<IRequestHandler>(BasicRequestHandler::class.java)
+                    .also { registerResource("request handler $sessionAlias", it::close) }
+                val sessionGroup = sessionAlias
+                val clientEventId = Event.start()
+                    .name("Client: $sessionAlias")
+                    .type("ClientEvent")
+                    .toBatchProto(rootEventId)
+                    .also(eventRouter::send)
+                    .getEvents(0).id
+
+                // component supported multithreading sending via single http client.
+                // increment sequence and putting into message batcher should be executed atomically.
+                val incomingLock = ReentrantLock()
+                val outgoingLock = ReentrantLock()
+                val incomingSequence = createSequence()
+                val outgoingSequence = createSequence()
+
+                val onRequest: (RawHttpRequest) -> Unit
+                val onResponse: (RawHttpRequest, RawHttpResponse<*>) -> Unit
+
+                if (useTransport) {
+                    onRequest = { request: RawHttpRequest ->
+                        val rawMessage = outgoingLock.withLock {
+                            request.toTransportMessage(sessionAlias, outgoingSequence()).also {
+                                transportMB.onMessage(it, sessionGroup)
+                            }
+                        }
+                        eventBatcher.storeEvent(
+                            rawMessage.eventId?.toProto() ?: rootEventId,
+                            "Sent HTTP request",
+                            "Send message"
                         )
                     }
-                    stateManager.onResponse(response)
+                    onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
+                        incomingLock.withLock {
+                            transportMB.onMessage(
+                                response.toTransportMessage(sessionAlias, incomingSequence(), request),
+                                sessionGroup
+                            )
+                        }
+                        stateManager.onResponse(response)
+                    }
+                } else {
+                    val connectionId = com.exactpro.th2.common.grpc.ConnectionID.newBuilder()
+                        .setSessionAlias(sessionAlias)
+                        .setSessionGroup(sessionGroup)
+                        .build()
+
+                    onRequest = { request: RawHttpRequest ->
+                        val rawMessage = outgoingLock.withLock {
+                            request.toProtoMessage(connectionId, outgoingSequence())
+                                .also(protoMB::onMessage)
+                        }
+                        eventBatcher.storeEvent(
+                            if (rawMessage.hasParentEventId()) rawMessage.parentEventId else rootEventId,
+                            "Sent HTTP request",
+                            "Send message"
+                        )
+                    }
+                    onResponse = { request: RawHttpRequest, response: RawHttpResponse<*> ->
+                        incomingLock.withLock {
+                            protoMB.onMessage(
+                                response.toProtoMessage(connectionId, incomingSequence(), request)
+                            )
+                        }
+                        stateManager.onResponse(response)
+                    }
+                }
+
+                with(sessionSettings) {
+                    val client = HttpClient(
+                        https,
+                        host,
+                        port,
+                        readTimeout,
+                        keepAliveTimeout,
+                        maxParallelRequests,
+                        defaultHeaders,
+                        stateManager::prepareRequest,
+                        onRequest,
+                        onResponse,
+                        stateManager::onStart,
+                        stateManager::onStop,
+                        validateCertificates,
+                        certificate
+                    ).apply { registerResource("client-$sessionAlias", ::close) }
+
+                    stateManager.runCatching {
+                        registerResource("state-manager-$sessionAlias", ::close)
+                        init(StateManagerContext(client, auth))
+                    }.onFailure {
+                        LOGGER.error(it) { "Failed to init state manager for client: $sessionAlias" }
+                        eventBatcher.storeEvent(clientEventId, "Failed to init state manager for client: $sessionAlias", "Error", it)
+                        throw it
+                    }
+
+                    requestHandler.runCatching {
+                        registerResource("request-handler-$sessionAlias", ::close)
+                        init(RequestHandlerContext(client))
+                    }.onFailure {
+                        LOGGER.error(it) { "Failed to init request handler for client: $sessionAlias" }
+                        eventBatcher.storeEvent(clientEventId, "Failed to init request handler for client: $sessionAlias", "Error", it)
+                        throw it
+                    }
+
+                    aliasToService[sessionAlias] = Holder(
+                        createExecutorService(maxParallelRequests),
+                        requestHandler,
+                        clientEventId,
+                    )
+
+                    client.runCatching(HttpClient::start).onFailure {
+                        throw IllegalStateException("Failed to start client: $sessionAlias", it)
+                    }
                 }
             }
-            val client = HttpClient(
-                https,
-                host,
-                port,
-                readTimeout,
-                keepAliveTimeout,
-                maxParallelRequests,
-                defaultHeaders,
-                stateManager::prepareRequest,
-                onRequest,
-                onResponse,
-                stateManager::onStart,
-                stateManager::onStop,
-                validateCertificates,
-                certificate
-            ).apply { registerResource("client", ::close) }
-
-            stateManager.runCatching {
-                registerResource("state-manager", ::close)
-                init(StateManagerContext(client, auth))
-            }.onFailure {
-                LOGGER.error(it) { "Failed to init state manager" }
-                eventBatcher.storeEvent(rootEventId, "Failed to init state manager", "Error", it)
-                throw it
-            }
-
-            requestHandler.runCatching {
-                registerResource("request-handler", ::close)
-                init(RequestHandlerContext(client))
-            }.onFailure {
-                LOGGER.error(it) { "Failed to init request handler" }
-                eventBatcher.storeEvent(rootEventId, "Failed to init request handler", "Error", it)
-                throw it
-            }
-
-            val sendService: ExecutorService = createExecutorService(maxParallelRequests)
 
             val proto = runCatching {
                 val listener = MessageListener<MessageGroupBatch> { _, message ->
                     message.groupsList.forEach { group ->
-                        sendService.submit {
-                            group.runCatching(requestHandler::onRequest).recoverCatching { error ->
-                                LOGGER.error(error) { "Failed to handle protobuf message group: ${group.toPrettyString()}" }
-                                group.parentEventIds.ifEmpty { sequenceOf(rootEventId) }.forEach {
-                                    eventBatcher.storeEvent(
-                                        it,
-                                        "Failed to handle protobuf message group",
-                                        "Error",
-                                        error
-                                    )
+                        val alias = group.sessionAlias
+                        aliasToService[alias]?.let { holder ->
+                            holder.service.submit {
+                                group.runCatching(holder.handler::onRequest).recoverCatching { error ->
+                                    LOGGER.error(error) { "Failed to handle protobuf message group: ${group.toPrettyString()}" }
+                                    group.parentEventIds.ifEmpty { sequenceOf(holder.clientEventId) }.forEach {
+                                        eventBatcher.storeEvent(
+                                            it,
+                                            "Failed to handle protobuf message group",
+                                            "Error",
+                                            error
+                                        )
+                                    }
                                 }
                             }
+                        } ?: run {
+                            LOGGER.error { "'$alias' session alias isn't in serviced, group: ${group.toPrettyString()}" }
+                            eventBatcher.storeEvent(
+                                rootEventId,
+                                "Failed to handle protobuf message group: '$alias' session alias isn't in serviced",
+                                "Error",
+                            )
                         }
                     }
                 }
@@ -259,20 +271,31 @@ class Application(
             }
 
             val transport = runCatching {
-                val listener = MessageListener<GroupBatch> { _, message ->
-                    message.groups.forEach { group ->
-                        sendService.submit {
-                            group.runCatching(requestHandler::onRequest).recoverCatching { error ->
-                                LOGGER.error(error) { "Failed to handle transport message group: $group" }
-                                group.eventIds.map(com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.EventId::toProto).ifEmpty { sequenceOf(rootEventId) }.forEach {
-                                    eventBatcher.storeEvent(
-                                        it,
-                                        "Failed to handle transport message group",
-                                        "Error",
-                                        error
-                                    )
+                val listener = MessageListener<GroupBatch> { _, batch ->
+                    batch.groups.forEach { group ->
+                        val alias = group.messages[0].id.sessionAlias
+                        aliasToService[alias]?.let { holder ->
+                            holder.service.submit {
+                                group.runCatching(holder.handler::onRequest).recoverCatching { error ->
+                                    LOGGER.error(error) { "Failed to handle transport message group: $group" }
+                                    group.eventIds.map(com.exactpro.th2.common.schema.message.impl.rabbitmq.transport.EventId::toProto)
+                                        .ifEmpty { sequenceOf(holder.clientEventId) }.forEach {
+                                            eventBatcher.storeEvent(
+                                                it,
+                                                "Failed to handle transport message group",
+                                                "Error",
+                                                error
+                                            )
+                                        }
                                 }
                             }
+                        } ?: run {
+                            LOGGER.error { "'$alias' session alias isn't in serviced, group: $group" }
+                            eventBatcher.storeEvent(
+                                rootEventId,
+                                "Failed to handle protobuf message group: '$alias' session alias isn't in serviced",
+                                "Error",
+                            )
                         }
                     }
                 }
@@ -286,10 +309,6 @@ class Application(
             if (proto.isFailure && transport.isFailure) {
                 error("Subscribe pin should be declared at least one of protobuf or transport protocols")
             }
-
-            client.runCatching(HttpClient::start).onFailure {
-                throw IllegalStateException("Failed to start client", it)
-            }
         }
     }
 
@@ -298,35 +317,7 @@ class Application(
     }
 }
 
-data class Settings(
-    val https: Boolean = false,
-    val host: String,
-    val port: Int = if (https) 443 else 80,
-    val readTimeout: Int = 5000,
-    val maxParallelRequests: Int = 5,
-    val keepAliveTimeout: Long = 15000,
-    val defaultHeaders: Map<String, List<String>> = emptyMap(),
-    val sessionAlias: String,
-    val auth: IAuthSettings? = null,
-    val validateCertificates: Boolean = true,
-    val useTransport: Boolean = false,
-    val batcherThreads: Int = 2,
-    val maxBatchSize: Int = 1000,
-    val maxFlushTime: Long = 1000,
-    @JsonDeserialize(converter = CertificateConverter::class) val clientCertificate: X509Certificate? = null,
-    @JsonDeserialize(converter = PrivateKeyConverter::class) val certificatePrivateKey: PrivateKey? = null,
-) {
-    @JsonIgnore
-    val certificate: Certificate? = clientCertificate?.run {
-        requireNotNull(certificatePrivateKey) {
-            "'${::clientCertificate.name}' setting requires '${::certificatePrivateKey.name}' setting to be set"
-        }
-
-        Certificate(clientCertificate, certificatePrivateKey)
-    }
-}
-
-private inline fun <reified T> load(defaultImpl: Class<out T>): T {
+inline fun <reified T> load(defaultImpl: Class<out T>): T {
     val instances = ServiceLoader.load(T::class.java).toList()
 
     return when (instances.size) {

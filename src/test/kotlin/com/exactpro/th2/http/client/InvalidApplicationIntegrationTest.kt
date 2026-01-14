@@ -1,5 +1,5 @@
 /*
- * Copyright 2023-2025 Exactpro (Exactpro Systems Limited)
+ * Copyright 2023-2026 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,6 +125,22 @@ class InvalidApplicationIntegrationTest {
                 .setSequence(1)
         }.build())
 
+        val batch = assertNotNull(eventListener.poll(ofSeconds(2)), "Client event is null")
+        expectThat(batch) {
+            get { eventsList }.single().and {
+                get { name }.isEqualTo("Client: test-session-alias")
+                get { type }.isEqualTo("ClientEvent")
+                get { status }.isEqualTo(EventStatus.SUCCESS)
+                get { id }.and {
+                    get { bookName }.isEqualTo(rootEventId.bookName)
+                    get { scope }.isEqualTo(rootEventId.scope)
+                }
+                get { parentId }.isEqualTo(rootEventId)
+                get { attachedMessageIdsList }.isEmpty()
+                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
+            }
+        }
+
         expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
             .get { eventsList }.single().and {
                 get { name }.isEqualTo("Failed to handle transport message group")
@@ -134,7 +150,7 @@ class InvalidApplicationIntegrationTest {
                     get { bookName }.isEqualTo(rootEventId.bookName)
                     get { scope }.isEqualTo(rootEventId.scope)
                 }
-                get { parentId }.isEqualTo(rootEventId)
+                get { parentId }.isEqualTo(batch.eventsList.single().id)
                 get { attachedMessageIdsList }.isEmpty()
                 get { body.toString(Charsets.UTF_8) }.matches(Regex("""
                     \[\{"data":"java\.net\.ConnectException: Connection refused( \(Connection refused\))?","type":"message"}]
@@ -155,7 +171,7 @@ class InvalidApplicationIntegrationTest {
             resources.add(resource, destructor)
         }
 
-        eventListener.assertRootEvent()
+        val rootEventId = eventListener.assertRootEvent().id
 
         application.start()
 
@@ -174,6 +190,20 @@ class InvalidApplicationIntegrationTest {
                 .setSequence(1)
             setEventId(eventId)
         }.build())
+
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
+            .get { eventsList }.single().and {
+                get { name }.isEqualTo("Client: test-session-alias")
+                get { type }.isEqualTo("ClientEvent")
+                get { status }.isEqualTo(EventStatus.SUCCESS)
+                get { id }.and {
+                    get { bookName }.isEqualTo(rootEventId.bookName)
+                    get { scope }.isEqualTo(rootEventId.scope)
+                }
+                get { parentId }.isEqualTo(rootEventId)
+                get { attachedMessageIdsList }.isEmpty()
+                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
+            }
 
         expectThat(eventListener.poll(ofSeconds(2))).isNotNull()
             .get { eventsList }.single().and {
@@ -205,7 +235,7 @@ class InvalidApplicationIntegrationTest {
             resources.add(resource, destructor)
         }
 
-        eventListener.assertRootEvent()
+        val rootEventId = eventListener.assertRootEvent().id
 
         application.start()
 
@@ -241,6 +271,21 @@ class InvalidApplicationIntegrationTest {
                 setEventId(eventIdB)
             }.build(),
         )
+
+        expectThat(eventListener.poll(ofSeconds(2))).isNotNull() and {
+            get { eventsList }.single().and {
+                get { name }.isEqualTo("Client: test-session-alias")
+                get { type }.isEqualTo("ClientEvent")
+                get { status }.isEqualTo(EventStatus.SUCCESS)
+                get { id }.and {
+                    get { bookName }.isEqualTo(rootEventId.bookName)
+                    get { scope }.isEqualTo(rootEventId.scope)
+                }
+                get { parentId }.isEqualTo(rootEventId)
+                get { attachedMessageIdsList }.isEmpty()
+                get { body.toString(Charsets.UTF_8) }.isEqualTo("[]")
+            }
+        }
 
         val events = listOf(
             assertNotNull(eventListener.poll(ofSeconds(2))),

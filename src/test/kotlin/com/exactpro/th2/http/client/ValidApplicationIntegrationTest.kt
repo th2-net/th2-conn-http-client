@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Exactpro (Exactpro Systems Limited)
+ * Copyright 2024-2026 Exactpro (Exactpro Systems Limited)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,8 +39,9 @@ import com.exactpro.th2.test.spec.subscribers
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import rawhttp.core.RawHttp
 import rawhttp.core.server.TcpRawHttpServer
 import java.time.Duration.ofSeconds
@@ -59,12 +60,21 @@ class ValidApplicationIntegrationTest {
     internal val customConfig = CustomConfigSpec.fromString(
         """
         {
-            "host": "127.0.0.1",
-            "port": $SERVER_PORT,
-            "validateCertificates": false,
-            "sessionAlias": "test-session-alias",
-            "maxParallelRequests": $MAX_PARALLEL_REQUESTS,
-            "useTransport": true
+            "useTransport": true,
+            "sessions": {
+                "$SESSION_ALIAS_1_TEST": {
+                    "host": "127.0.0.1",
+                    "port": $SERVER_PORT,
+                    "validateCertificates": false,
+                    "maxParallelRequests": $MAX_PARALLEL_REQUESTS
+                },
+                "$SESSION_ALIAS_2_TEST": {
+                    "host": "127.0.0.1",
+                    "port": $SERVER_PORT,
+                    "validateCertificates": false,
+                    "maxParallelRequests": $MAX_PARALLEL_REQUESTS
+                }
+            }
         }
         """.trimIndent()
     )
@@ -85,11 +95,17 @@ class ValidApplicationIntegrationTest {
             }
         }
 
-    @Test
     @Timeout(30)
+    @ParameterizedTest
+    @CsvSource(
+        "$SESSION_ALIAS_1_TEST,$SESSION_GROUP_1_TEST",
+        "$SESSION_ALIAS_2_TEST,$SESSION_GROUP_2_TEST",
+    )
     fun `sequence order test`(
-        @Th2AppFactory appFactory: CommonFactory,
+        sessionAlias: String,
+        sessionGroup: String,
         @Th2TestFactory testFactory: CommonFactory,
+        @Th2AppFactory appFactory: CommonFactory,
         resources: CleanupExtension.Registry,
     ) {
         val iterations = 1_000
@@ -104,7 +120,7 @@ class ValidApplicationIntegrationTest {
 
         val messageGroup = RawMessage.builder().apply {
             idBuilder()
-                .setSessionAlias(SESSION_ALIAS_TEST)
+                .setSessionAlias(sessionAlias)
                 .setTimestamp(Instant.now())
                 .setDirection(OUTGOING)
                 .setSequence(1)
@@ -112,7 +128,7 @@ class ValidApplicationIntegrationTest {
 
         val groupBatch = GroupBatch.builder().apply {
             setBook(BOOK_TEST)
-            setSessionGroup(SESSION_GROUP_TEST)
+            setSessionGroup(sessionGroup)
             groupsBuilder().apply {
                 repeat(iterations) {
                     add(messageGroup)
@@ -155,8 +171,10 @@ class ValidApplicationIntegrationTest {
         private val LOGGER = KotlinLogging.logger { }
 
         private const val BOOK_TEST = "test-book"
-        private const val SESSION_ALIAS_TEST = "test-session-alias"
-        private const val SESSION_GROUP_TEST = "test-session-group"
+        private const val SESSION_ALIAS_1_TEST = "test-session-alias-1"
+        private const val SESSION_GROUP_1_TEST = "test-session-group-1"
+        private const val SESSION_ALIAS_2_TEST = "test-session-alias-2"
+        private const val SESSION_GROUP_2_TEST = "test-session-group-2"
 
         private const val MAX_PARALLEL_REQUESTS = 5
         private const val SERVER_PORT = 8086
